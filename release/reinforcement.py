@@ -2,25 +2,31 @@
 This class implements simple policy gradient algorithm for
 biasing the generation of molecules towards desired values of
 properties aka Reinforcement Learninf for Structural Evolution (ReLeaSE)
-as described in 
-Popova, M., Isayev, O., & Tropsha, A. (2018). 
-Deep reinforcement learning for de novo drug design. 
+as described in
+Popova, M., Isayev, O., & Tropsha, A. (2018).
+Deep reinforcement learning for de novo drug design.
 Science advances, 4(7), eaap7885.
 """
 
 import torch
 import torch.nn.functional as F
 import numpy as np
+import collections
 from rdkit import Chem
 
 
+from utils import get_ECFP, normalize_fp, mol2image
+
+
 class Reinforcement(object):
-    def __init__(self, generator, predictor, get_reward):
+    def __init__(self, args, generator, predictor, get_reward, get_end_of_batch_reward=None):
         """
         Constructor for the Reinforcement object.
 
         Parameters
         ----------
+        args: object used to store parameters of the model
+
         generator: object of type StackAugmentedRNN
             generative model that produces string of characters (trajectories)
 
@@ -44,9 +50,14 @@ class Reinforcement(object):
         """
 
         super(Reinforcement, self).__init__()
+        self.args = args
         self.generator = generator
         self.predictor = predictor
         self.get_reward = get_reward
+        self.get_end_of_batch_reward = get_end_of_batch_reward
+        self.trajectories = collections.deque(maxlen=500)
+        self.similarity_fingerprint = np.zeros((2048, ))
+
 
     def policy_gradient(self, data, n_batch=10, gamma=0.97,
                         std_smiles=False, grad_clipping=None, **kwargs):
@@ -96,7 +107,12 @@ class Reinforcement(object):
         rl_loss = 0
         self.generator.optimizer.zero_grad()
         total_reward = 0
-        
+        batch_distinct_rewards = []
+        batch_rewards = []
+
+        trajectories = []
+        fngps = []
+
         for _ in range(n_batch):
 
             # Sampling new trajectory
@@ -105,23 +121,53 @@ class Reinforcement(object):
             while reward == 0:
                 trajectory = self.generator.evaluate(data)
                 if std_smiles:
-                    try:
                         mol = Chem.MolFromSmiles(trajectory[1:-1])
-                        trajectory = '<' + Chem.MolToSmiles(mol) + '>'
-                        reward = self.get_reward(trajectory[1:-1], 
-                                                 self.predictor, 
-                                                 **kwargs)
-                    except:
-                        reward = 0
+                        if mol:
+                            fngp = mol2image(mol)
+                            fngps.append(fngp)
+                            trajectory = '<' + Chem.MolToSmiles(mol) + '>'
+                            if isinstance(self.predictor, list):
+                                reward, distinct_rwds = self.get_reward(self, self.args, [mol], np.expand_dims(fngp, axis=0),
+                                                                        self.predictor,
+                                                                        **kwargs)
+                            else:
+                                reward = self.get_reward(self.args, trajectory[1:-1],
+                                                         self.predictor,
+                                                         **kwargs)
+                                distinct_rwds = []
+
+                        else:
+                            reward = 0
                 else:
-                    reward = self.get_reward(trajectory[1:-1],
-                                             self.predictor, 
-                                             **kwargs)
+                    if isinstance(self.predictor, list):
+
+                        reward, distinct_rwds = self.get_reward(self, self.args, trajectory[1:-1],
+                                                                self.predictor,
+                                                                **kwargs)
+                    else:
+                        reward = self.get_reward(self.args, trajectory[1:-1],
+                                                 self.predictor,
+                                                 **kwargs)
+                        distinct_rwds = []
+
+            batch_rewards.append(reward)
+            if distinct_rwds:
+                batch_distinct_rewards.append(distinct_rwds)
+
+            trajectories.append(trajectory)
+
+        end_of_batch_rewards = np.zeros((n_batch,))
+
+        if self.get_end_of_batch_reward:
+            end_of_batch_rewards = self.get_end_of_batch_reward(fngps)
+
+
+        for j, tr in enumerate(trajectories):
 
             # Converting string of characters into tensor
-            trajectory_input = data.char_tensor(trajectory)
-            discounted_reward = reward
-            total_reward += reward
+            trajectory_input = data.char_tensor(tr)
+            discounted_reward = batch_rewards[j] + end_of_batch_rewards[j]
+            total_reward += batch_rewards[j]
 
             # Initializing the generator's hidden state
             hidden = self.generator.init_hidden()
@@ -134,23 +180,44 @@ class Reinforcement(object):
                 stack = None
 
             # "Following" the trajectory and accumulating the loss
-            for p in range(len(trajectory)-1):
-                output, hidden, stack = self.generator(trajectory_input[p], 
-                                                       hidden, 
+            for p in range(len(tr) - 1):
+                output, hidden, stack = self.generator(trajectory_input[p],
+                                                       hidden,
                                                        stack)
                 log_probs = F.log_softmax(output, dim=1)
-                top_i = trajectory_input[p+1]
-                rl_loss -= (log_probs[0, top_i]*discounted_reward)
+                top_i = trajectory_input[p + 1]
+                rl_loss -= (log_probs[0, top_i] * discounted_reward)
                 discounted_reward = discounted_reward * gamma
 
         # Doing backward pass and parameters update
         rl_loss = rl_loss / n_batch
         total_reward = total_reward / n_batch
+
+        for k in range(n_batch):
+            batch_distinct_rewards[k] = batch_distinct_rewards[k] + [end_of_batch_rewards[k]]
+
+        batch_distinct_rewards = np.sum(np.array(batch_distinct_rewards), axis=0) / n_batch
         rl_loss.backward()
         if grad_clipping is not None:
-            torch.nn.utils.clip_grad_norm_(self.generator.parameters(), 
+            torch.nn.utils.clip_grad_norm_(self.generator.parameters(),
                                            grad_clipping)
 
         self.generator.optimizer.step()
-        
-        return total_reward, rl_loss.item()
+
+        return total_reward, rl_loss.item(), batch_distinct_rewards
+
+    def update_trajectories(self, smiles):
+        self.trajectories.extend(smiles)
+        self.similarity_fingerprint = self.get_sim_fngp()
+
+    def get_sim_fngp(self):
+        fp_all = np.zeros(2048)
+        fps = {}
+        for sm in self.trajectories:
+            fps[sm] = get_ECFP(sm)
+            fp_all += fps[sm]
+        fp_all_norm = normalize_fp(fp_all)
+        return fp_all_norm
+
+
+

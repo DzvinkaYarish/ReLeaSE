@@ -240,3 +240,4 @@ if __name__ == "__main__":
         print("Unbalanced generation of batches")
     if len(X) != 10: print("Error in batchsize generation")
 
+

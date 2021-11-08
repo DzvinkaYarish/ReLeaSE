@@ -10,7 +10,8 @@ class GeneratorData(object):
     """
     Docstring coming soon...
     """
-    def __init__(self, training_data_path, tokens=None, start_token='<', 
+
+    def __init__(self, training_data_path, tokens=None, start_token='<',
                  end_token='>', max_len=120, use_cuda=None, **kwargs):
         """
         Constructor for the GeneratorData object.
@@ -55,13 +56,13 @@ class GeneratorData(object):
             kwargs['cols_to_read'] = []
 
         data = read_object_property_file(training_data_path,
-                                                       **kwargs)
+                                         **kwargs)
         self.start_token = start_token
         self.end_token = end_token
         self.file = []
         for i in range(len(data)):
             if len(data[i]) <= max_len:
-                self.file.append(self.start_token + data[i] + self.end_token) 
+                self.file.append(self.start_token + data[i] + self.end_token)
         self.file_len = len(self.file)
         self.all_characters, self.char2idx, \
         self.n_characters = tokenize(self.file, tokens)
@@ -80,7 +81,7 @@ class GeneratorData(object):
         Returns:
             random_smiles (str).
         """
-        index = random.randint(0, self.file_len-1)
+        index = random.randint(0, self.file_len - 1)
         return self.file[index]
 
     def char_tensor(self, string):
@@ -109,7 +110,7 @@ class GeneratorData(object):
 
     def read_sdf_file(self, path, fields_to_read):
         raise NotImplementedError
-        
+
     def update_data(self, path):
         self.file, success = read_smi_file(path, unique=True)
         self.file_len = len(self.file)
@@ -129,7 +130,7 @@ class PredictorData(object):
                 self.y = self.y.reshape(-1)
         else:
             self.objects = np.array(data[:labels_start]).reshape(-1)
-            self.y = [None]*len(self.object)
+            self.y = [None] * len(self.object)
         assert len(self.objects) == len(self.y)
         if get_features is not None:
             self.x, processed_indices, invalid_indices = \
@@ -146,3 +147,4 @@ class PredictorData(object):
 
     def binarize(self, threshold):
         self.binary_y = np.array(self.y >= threshold, dtype='int32')
+

@@ -3,11 +3,20 @@ import time
 import math
 import numpy as np
 import warnings
+from tqdm import tqdm
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 from rdkit import Chem
+from rdkit.Chem import AllChem
 from rdkit import DataStructs
-from sklearn.model_selection import KFold, StratifiedKFold
+from rdkit.Chem.Draw import DrawingOptions
+from rdkit.Chem import Draw
+DrawingOptions.atomLabelFontSize = 50
+DrawingOptions.dotsPerAngstrom = 100
+DrawingOptions.bondLineWidth = 3
 
+from sklearn.model_selection import KFold, StratifiedKFold
 
 def get_fp(smiles):
     fp = []
@@ -23,6 +32,21 @@ def get_fp(smiles):
             processed_indices.append(i)
     return np.array(fp), processed_indices, invalid_indices
 
+def get_fp_and_mol(smiles, max_path=4):
+    fp = []
+    processed_indices = []
+    invalid_indices = []
+    mols = []
+    for i in range(len(smiles)):
+        mol = smiles[i]
+        mols.append(mol)
+        tmp = np.array(mol2image(mol, n=2048, max_path=max_path))
+        if np.isnan(tmp[0]):
+            invalid_indices.append(i)
+        else:
+            fp.append(tmp)
+            processed_indices.append(i)
+    return np.array(fp), mols, processed_indices, invalid_indices
 
 def get_desc(smiles, calc):
     desc = []
@@ -41,6 +65,38 @@ def get_desc(smiles, calc):
     desc_array = np.array(desc)
     return desc_array, processed_indices, invalid_indices
 
+
+def get_ECFP(smiles):
+    if isinstance(smiles, str):
+        try:
+            m = Chem.MolFromSmiles(smiles)
+            fp = AllChem.GetMorganFingerprintAsBitVect(m, 2, invariants=[1]*m.GetNumAtoms())
+            array = np.zeros((0, ), dtype=np.int8)
+            DataStructs.ConvertToNumpyArray(fp, array)
+            return array
+        except Exception as e:
+            # print(e)
+            empty = np.zeros(2048)
+            # empty[:] = np.nan
+            return empty
+    else:
+        try:
+            m = smiles
+            fp = AllChem.GetMorganFingerprintAsBitVect(m, 2, invariants=[1] * m.GetNumAtoms())
+            array = np.zeros((0,), dtype=np.int8)
+            DataStructs.ConvertToNumpyArray(fp, array)
+            return array
+        except Exception as e:
+        # print(e)
+            empty = np.zeros(2048)
+            # empty[:] = np.nan
+            return empty
+
+
+def normalize_fp(fp):
+    if np.sum(fp) == 0:
+        return fp
+    return fp / np.sum(fp)
 
 def normalize_desc(desc_array, desc_mean=None):
     desc_array = np.array(desc_array).reshape(len(desc_array), -1)
@@ -65,15 +121,20 @@ def normalize_desc(desc_array, desc_mean=None):
     return desc_array, desc_mean
 
 
-def mol2image(x, n=2048):
-    try:
+def mol2image(x, n=2048, max_path=4):
+    if isinstance(x, str):
         m = Chem.MolFromSmiles(x)
-        fp = Chem.RDKFingerprint(m, maxPath=4, fpSize=n)
-        res = np.zeros(len(fp))
-        DataStructs.ConvertToNumpyArray(fp, res)
-        return res
-    except:
-        return [np.nan]
+        if not m:
+            return [np.nan]
+    else:
+        m = x
+
+    fp = Chem.RDKFingerprint(m, maxPath=max_path, fpSize=n)
+    res = np.zeros(len(fp), dtype=np.uint8)
+    DataStructs.ConvertToNumpyArray(fp, res)
+    return res
+
+
 
 
 def sanitize_smiles(smiles, canonical=True, throw_warning=False):
@@ -302,3 +363,113 @@ def read_object_property_file(path, delimiter=',', cols_to_read=[0, 1],
     if len(cols_to_read) == 1:
         data = data[0]
     return data
+
+def simple_moving_average(previous_values, new_value, ma_window_size=10):
+    value_ma = np.sum(previous_values[-(ma_window_size-1):]) + new_value
+    value_ma = value_ma/(len(previous_values[-(ma_window_size-1):]) + 1)
+    return value_ma
+
+def moving_average(a, n=3) :
+    ret = np.cumsum(a, dtype=float)
+    ret[n:] = ret[n:] - ret[:-n]
+    return ret[n - 1:] / n
+
+
+def plot_dist(prediction, name, **kwargs):
+    mean = kwargs.get('mean', 0)
+    std = kwargs.get('std', 1)
+    interval = kwargs.get('interval', None)
+
+    prediction = prediction * std + mean
+    # print("Mean value of predictions:", prediction.mean())
+    ax = sns.kdeplot(prediction, shade=True)
+    ax.set(xlabel=f'Predicted {name}',
+           title=f'Distribution of predicted {name} for generated molecules')
+    if interval:
+        ax.axvline(x=interval[0], color='r')
+        ax.axvline(x=interval[1], color='r')
+
+
+def plot_hist(prediction, name, **kwargs):
+    mean = kwargs.get('mean', 0)
+    std = kwargs.get('std', 1)
+    interval = kwargs.get('interval', None)
+
+    prediction = prediction * std + mean
+    plt.hist(prediction, alpha=0.5)
+    plt.xlabel(f'Predicted {name}')
+    plt.title(f'Distribution of predicted {name} for generated molecules')
+
+
+def generate(generator, n_to_generate, gen_data):
+    generated = []
+    pbar = tqdm(range(n_to_generate))
+    for i in pbar:
+        pbar.set_description("Generating molecules...")
+        generated.append(generator.evaluate(gen_data, predict_len=120)[1:-1])
+
+    sanitized = canonical_smiles(generated, sanitize=True, throw_warning=False)[:-1]
+
+    valid_num = (n_to_generate - sanitized.count(''))
+    unique_smiles = list(np.unique([s for s in sanitized if s]))
+    unique_num = len(unique_smiles)
+
+
+    return unique_smiles, valid_num / n_to_generate, unique_num / valid_num
+
+
+def estimate_and_update(generator, predictor, n_to_generate, gen_data, p_name, **kwargs):
+    generated = []
+    pbar = tqdm(range(n_to_generate))
+    for i in pbar:
+        pbar.set_description("Generating molecules...")
+        generated.append(generator.evaluate(gen_data, predict_len=120)[1:-1])
+
+    sanitized = canonical_smiles(generated, sanitize=False, throw_warning=False)[:-1]
+
+    valid_num = (n_to_generate - sanitized.count(''))
+    unique_smiles = list(np.unique([s for s in sanitized if s]))[1:]
+    unique_num = len(unique_smiles)
+    smiles, prediction, nan_smiles = predictor.predict(unique_smiles, get_features=get_fp)
+
+    if predictor.model_type == 'classifier':
+        plot_hist(prediction, p_name, **kwargs)
+    else:
+        plot_dist(prediction, p_name, **kwargs)
+
+    return smiles, prediction, valid_num / n_to_generate, unique_num / valid_num
+
+
+def predict_and_plot(smiles, predictor, p_name, **kwargs):
+    get_features = kwargs.get('get_features')
+
+    smiles, prediction, nan_smiles = predictor.predict(smiles, get_features=get_features)
+    if predictor.model_type == 'classifier':
+        plot_hist(prediction, p_name, **kwargs)
+    else:
+        plot_dist(prediction, p_name, **kwargs)
+
+    return smiles, prediction
+
+
+def save_smiles(args, smiles_cur):
+
+    path_to_experiment = args.experiments_general_path+args.experiment_name
+
+    with open(f'{path_to_experiment}/generated_smiles.txt', 'a') as f:
+        for sm in smiles_cur:
+            f.write(str(sm))
+            f.write('\n')
+        f.write('\n')
+
+
+def draw_smiles(args, smiles_cur, prediction_cur):
+    print(len(smiles_cur))
+    print(len(prediction_cur))
+    ind = np.random.randint(0, len(smiles_cur), args.n_to_draw)
+    mols_to_draw_max = [Chem.MolFromSmiles(smiles_cur[i], sanitize=True) for i in ind]
+    legends = ['pIC50 = ' + str(prediction_cur[i]) for i in ind]
+
+    img = Draw.MolsToGridImage(mols_to_draw_max, molsPerRow=5,
+                               subImgSize=(300, 300), legends=legends)
+    return img

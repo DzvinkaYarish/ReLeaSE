@@ -68,3 +68,4 @@ class RNNPredictor(object):
             canonical_smiles = canonical_smiles[0]
             prediction = [prediction[0]]
         return canonical_smiles, prediction, invalid_smiles
+
