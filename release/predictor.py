@@ -3,7 +3,7 @@ from __future__ import division
 
 import numpy as np
 
-from sklearn.externals import joblib
+import joblib
 from sklearn import metrics
 
 from utils import get_fp, get_desc, normalize_desc, cross_validation_split
