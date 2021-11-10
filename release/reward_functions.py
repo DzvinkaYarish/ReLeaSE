@@ -238,12 +238,27 @@ def get_range_reward(args, smiles, predictors, invalid_reward=0.0, get_features=
         rwds.append(2. if (prop[0] > 180. and prop[0] < 450.) else 0.)
     return np.sum(rwds), rwds
 
-def get_reward_min(args, smiles, predictor, invalid_reward=0.0, get_features=get_fp):
+def get_reward_max_ic50(rl, args, mols, fngps, predictors, invalid_reward=0.0, get_features=get_fp):
+    rwds = []
+    predictors_names = [i['name'] for i in args.objectives_names_and_paths]
 
-    mol, prop, nan_smiles = predictor.predict([smiles], get_features=get_features)
-    if len(nan_smiles) == 1:
-        return invalid_reward
-    return np.exp(-prop[0] + 1)
+    for i, p_name_, p in zip(range(len(predictors_names)), predictors_names, predictors):
+        if p_name_ in PROPERTY_PREDICTORS:
+            mol, prop, nan_smiles = p.predict(mols, get_features=None)
+        else:
+            mol, prop, nan_smiles = p.predict(fngps, get_features=None)
+
+        if len(nan_smiles) == 1:
+            return invalid_reward, [invalid_reward] * len(predictors)
+
+        if p_name_ == 'IC50':  # ic50
+            # rwds.append(np.exp((prop[0] - 5) / 3.))
+            rwds.append(np.exp(prop[0] / 3))
+    return np.sum(rwds), rwds
+
+def get_empty_reward(rl, args, mols, fngps, predictors, invalid_reward=0.0, get_features=get_fp):
+    rwds = [1] * len(predictors)
+    return np.sum(rwds), rwds
 
 def get_reward_func(args):
     """
@@ -258,9 +273,10 @@ def get_reward_func(args):
     if metric == 'multi_reward_with_mw': return get_multi_reward_with_mw
     if metric == 'multi_reward_ranges_max_ic50': return get_multi_reward_ranges_max_ic50
     if metric == 'multi_reward_with_mpt': return get_multi_reward_with_mpt
-    if metric == 'reward_min': return get_reward_min
+    if metric == 'reward_max_ic50': return get_reward_max_ic50
     if metric == 'multi_reward_ranges_max_ic50_similarity_penalty': return get_multi_reward_ranges_max_ic50_similarity_penalty
     if metric == 'multi_reward_ranges_multiple_ic50': return get_multi_reward_ranges_multiple_ic50
+    if metric == 'empty_reward': return get_empty_reward
     else: raise ValueError(f'Metric "{metric}" not supported.')
 
 

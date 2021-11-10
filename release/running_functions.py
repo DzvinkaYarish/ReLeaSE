@@ -113,6 +113,7 @@ def training(args, RL_multi, gen_data, predictors,  unbiased_predictions):
         for j in trange(args.n_policy, desc='Policy gradient...'):
 
             cur_reward, cur_loss, cur_distinct_rewards = RL_multi.policy_gradient(gen_data, std_smiles=True, get_features=[None] * len(predictors_names))
+            print(cur_loss)
 
         for i, p_name in enumerate(predictors_names):
             writer.add_scalar(f'distinct_rewards/{p_name}', cur_distinct_rewards[i], step)
@@ -122,8 +123,8 @@ def training(args, RL_multi, gen_data, predictors,  unbiased_predictions):
 
         smiles_cur, valid_ratio, unique_ratio = generate(RL_multi.generator, args.n_to_generate, gen_data)
 
-        if step % args.trajectory_queue_update_freq == 0:
-            RL_multi.update_trajectories(smiles_cur)
+        # if step % args.trajectory_queue_update_freq == 0:
+        #     RL_multi.update_trajectories(smiles_cur)
 
         plt.clf()
 
