@@ -56,8 +56,8 @@ def run(args):
             predictor = PropertyPredictor(PROPERTY_PREDICTORS[obj_parameters['name']], obj_parameters['model_type'])
         else:
             model_type = obj_parameters['model_type']
-            # p_name = obj_parameters['data_path'].split('/')[-1].split('_')[0]
-            p_name = obj_parameters['name']
+            p_name = obj_parameters['data_path'].split('/')[-1].split('_')[0]
+            # p_name = obj_parameters['name']
 
             model_instance = PROPERTY_ESTIMATORS[obj_parameters['model_class']]
             predictor = VanillaQSAR(model_class=obj_parameters['model_class'],
@@ -66,7 +66,7 @@ def run(args):
                                        model_type=model_type)
 
             if os.path.exists(args.path_to_predictors+f'predictor_{p_name}0.pkl'):
-                print(f'Loading predictor {i}')
+                print(f'Loading predictor {i} from {args.path_to_predictors}predictor_{p_name}')
                 predictor.load_model(args.path_to_predictors+f'predictor_{p_name}')
             else:
                 print(f'Fitting predictor {i}')
@@ -112,7 +112,9 @@ def training(args, RL_multi, gen_data, predictors,  unbiased_predictions):
 
         for j in trange(args.n_policy, desc='Policy gradient...'):
 
-            cur_reward, cur_loss, cur_distinct_rewards = RL_multi.policy_gradient(gen_data, std_smiles=True, get_features=[None] * len(predictors_names))
+            # cur_reward, cur_loss, cur_distinct_rewards = RL_multi.policy_gradient(gen_data, std_smiles=True, get_features=[None] * len(predictors_names))
+            cur_reward, cur_loss, cur_distinct_rewards = RL_multi.policy_gradient(gen_data, std_smiles=False, get_features=get_fp)
+
             print(cur_loss)
 
         for i, p_name in enumerate(predictors_names):
