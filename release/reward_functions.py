@@ -252,8 +252,7 @@ def get_reward_max_ic50(rl, args, mols, fngps, predictors, invalid_reward=0.0, g
             return invalid_reward, [invalid_reward] * len(predictors)
 
         if p_name_ == 'IC50':  # ic50
-            # rwds.append(np.exp((prop[0] - 5) / 3.))
-            rwds.append(np.exp(prop[0] / 3))
+            rwds.append(np.exp((prop[0] - 5) / 3.))
     return np.sum(rwds), rwds
 
 def get_empty_reward(rl, args, mols, fngps, predictors, invalid_reward=0.0, get_features=get_fp):
