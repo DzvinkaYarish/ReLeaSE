@@ -48,9 +48,9 @@ def add_parsing_args(parser: ArgumentParser):
         # {'name':'jak1_binary', 'model_class': 'CatBoost', 'interval': None, 'model_type': 'classifier', 'data_path': '', 'model_params': {'n_estimators': 250}, 'stats_to_norm': [0,  1], 'stats_to_real': [0, 1]},
 
         {'name':'IC50',  'model_class': 'RFR', 'interval': None, 'model_type': 'regressor', 'data_path': '/home/dzvinka/ReLeaSE/data/jak2_data.csv', 'model_params': {'n_estimators': 250, 'n_jobs': 10,}, 'stats_to_norm': [6.571506827780664,  0.405556162912055], 'stats_to_real': [0, 1]},
-        # {'name':'logP', 'model_class': 'RFR', 'interval': [2, 4], 'model_type': 'regressor', 'data_path': '/home/dzvinka/ReLeaSE/data/logP_labels.csv', 'model_params': {'n_estimators': 250, 'n_jobs': 10,}, 'stats_to_norm': [2.3744083807347933,  0.9429912852261682], 'stats_to_real': [0,1]},
+        {'name':'logP', 'model_class': 'RFR', 'interval': [2, 4], 'model_type': 'regressor', 'data_path': '/home/dzvinka/ReLeaSE/data/logP_labels.csv', 'model_params': {'n_estimators': 250, 'n_jobs': 10,}, 'stats_to_norm': [2.3744083807347933,  0.9429912852261682], 'stats_to_real': [0,1]},
         # {'name':'mpC', 'model_class': 'RFR', 'interval': [50, 250], 'model_type': 'regressor', 'data_path': '/home/dzvinka/ReLeaSE/data/mpC_data.csv', 'model_params': {'n_estimators': 250, 'n_jobs': 10,}, 'stats_to_norm': [153.76311716715495,  33.472182703355514], 'stats_to_real': [92.0924114641032, 93.92472573003356]},
-        # {'name': 'mwt',  'model_type': 'regressor', 'interval': [180, 459], 'stats_to_real': [0, 1], 'stats_to_norm': [367.93905744040325, 107.99177665887633]}
+        {'name': 'mwt',  'model_type': 'regressor', 'interval': [180, 459], 'stats_to_real': [0, 1], 'stats_to_norm': [367.93905744040325, 107.99177665887633]}
     ],
         help='Settings for the corresponding objectives.')
 

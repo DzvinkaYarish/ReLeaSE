@@ -113,9 +113,10 @@ def training(args, RL_multi, gen_data, predictors,  unbiased_predictions):
         for j in trange(args.n_policy, desc='Policy gradient...'):
 
             # cur_reward, cur_loss, cur_distinct_rewards = RL_multi.policy_gradient(gen_data, std_smiles=True, get_features=[None] * len(predictors_names))
-            cur_reward, cur_loss, cur_distinct_rewards = RL_multi.policy_gradient(gen_data, std_smiles=False, get_features=get_fp)
+            cur_reward, cur_loss, cur_distinct_rewards = RL_multi.policy_gradient(gen_data, std_smiles=False)
 
             print(cur_loss)
+            print(cur_reward)
 
         for i, p_name in enumerate(predictors_names):
             writer.add_scalar(f'distinct_rewards/{p_name}', cur_distinct_rewards[i], step)

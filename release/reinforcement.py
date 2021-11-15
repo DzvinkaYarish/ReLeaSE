@@ -112,7 +112,6 @@ class Reinforcement(object):
 
         trajectories = []
         fngps = []
-
         for _ in range(n_batch):
 
             # Sampling new trajectory
@@ -159,6 +158,8 @@ class Reinforcement(object):
         end_of_batch_rewards = np.zeros((n_batch,))
 
         if self.get_end_of_batch_reward:
+            fngps = [mol2image(Chem.MolFromSmiles(tr[1:-1])) for tr in trajectories]
+
             end_of_batch_rewards = self.get_end_of_batch_reward(fngps)
 
 
@@ -168,6 +169,8 @@ class Reinforcement(object):
             trajectory_input = data.char_tensor(tr)
             discounted_reward = batch_rewards[j] + end_of_batch_rewards[j]
             total_reward += batch_rewards[j]
+            total_reward += end_of_batch_rewards[j]
+
 
             # Initializing the generator's hidden state
             hidden = self.generator.init_hidden()
