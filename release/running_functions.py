@@ -57,6 +57,7 @@ def run(args):
         else:
             model_type = obj_parameters['model_type']
             p_name = obj_parameters['data_path'].split('/')[-1].split('_')[0]
+            print(p_name)
             # p_name = obj_parameters['name']
 
             model_instance = PROPERTY_ESTIMATORS[obj_parameters['model_class']]
@@ -91,6 +92,7 @@ def run(args):
 
 def training(args, RL_multi, gen_data, predictors,  unbiased_predictions):
     predictors_names = [p['name'] for p in args.objectives_names_and_paths]
+    print(predictors_names)
     stats_to_real = [p['stats_to_real'] for p in args.objectives_names_and_paths]
     intervals = [p['interval'] for p in args.objectives_names_and_paths]
     path_to_experiment = args.experiments_general_path+args.experiment_name
@@ -115,8 +117,6 @@ def training(args, RL_multi, gen_data, predictors,  unbiased_predictions):
             # cur_reward, cur_loss, cur_distinct_rewards = RL_multi.policy_gradient(gen_data, std_smiles=True, get_features=[None] * len(predictors_names))
             cur_reward, cur_loss, cur_distinct_rewards = RL_multi.policy_gradient(gen_data, std_smiles=False)
 
-            print(cur_loss)
-            print(cur_reward)
 
         for i, p_name in enumerate(predictors_names):
             writer.add_scalar(f'distinct_rewards/{p_name}', cur_distinct_rewards[i], step)

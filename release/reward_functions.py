@@ -33,7 +33,7 @@ def get_end_of_batch_reward_tanimoto_sim(fngps):
 
     avg_sim = calc_sim_ind_tanimoto(fngps)
 
-    rwd = [-np.power(s * 4, 2) + 1 if s > 0.37 else 0 for s in avg_sim]
+    rwd = [-np.power(s * 4, 2) - 1 if s > 0.37 else 0 for s in avg_sim]
 
     return rwd
 
@@ -75,6 +75,40 @@ def get_multi_reward_ranges_multiple_ic50(rl, args, mols, fngps, predictors, get
             else:
                 rwds.append(0.)
     return np.sum(rwds), rwds
+
+
+def get_multi_reward_ranges_multiple_ic50_smiles(args, smiles, predictors, invalid_reward=0.0, get_features=get_fp):
+    rwds = []
+    predictors_names = [i['name'] for i in args.objectives_names_and_paths]
+
+
+    for i, p_name_, p in zip(range(len(predictors_names)), predictors_names, predictors):
+
+        mol, prop, nan_smiles = p.predict([smiles], get_features=get_features)
+
+        if len(nan_smiles) == 1:
+            return invalid_reward, [invalid_reward] * len(predictors)
+        if p_name_ == 'IC50':  # ic50
+            rwds.append(np.exp((prop[0] - 5) / 3.))
+        elif p_name_ == 'jak1_binary': #binds/doesn't bind to jak1
+            rwds.append(0. if (prop[0] == 0.) else -2.)
+        elif p_name_ == 'jak3_binary': #binds/doesn't bind to jak1
+            rwds.append(0. if (prop[0] == 0.) else -2.)
+        elif p_name_ == 'logP':  # logp
+            rwds.append(2. if ((prop[0] > 1.) and (prop[0] < 4.)) else 0.)
+        elif p_name_ == 'mpC':  # mpt  ??????? == mpC ?????
+            p = (prop[0] * 93.92472573003356) + 92.0924114641032
+            rwds.append(2. if ((p >= 50.) and (p <= 250.0)) else 0.)
+        else:  # mw
+            if ((prop[0] > 180.) and (prop[0] < 450.)):
+                rwds.append(2)
+            elif prop[0] < 180.:
+                rwds.append(-1.)
+            else:
+                rwds.append(0.)
+
+    return np.sum(rwds), rwds
+
 
 
 
@@ -156,7 +190,8 @@ def get_multi_reward_ranges_max_ic50_smiles(args, smiles, predictors, invalid_re
                 rwds.append(-1.)
             else:
                 rwds.append(0.)
-        return np.sum(rwds), rwds
+
+    return np.sum(rwds), rwds
 
 
 def get_multi_reward_ranges_max_ic50(rl, args, mols, fngps, predictors, invalid_reward=0.0, get_features=get_fp):
@@ -321,6 +356,8 @@ def get_reward_func(args):
     if metric == 'reward_max_ic50_smiles': return get_reward_max_ic50_smiles
     if metric == 'multi_reward_ranges_max_ic50_similarity_penalty': return get_multi_reward_ranges_max_ic50_similarity_penalty
     if metric == 'multi_reward_ranges_multiple_ic50': return get_multi_reward_ranges_multiple_ic50
+    if metric == 'multi_reward_ranges_multiple_ic50_smiles': return get_multi_reward_ranges_multiple_ic50_smiles
+
     if metric == 'empty_reward': return get_empty_reward
     else: raise ValueError(f'Metric "{metric}" not supported.')
 

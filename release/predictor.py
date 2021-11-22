@@ -208,7 +208,8 @@ class VanillaQSAR(object):
                     if self.model_type == 'classifier':
                         # unique, counts = np.unique(prediction, return_counts=True)
                         # prediction = np.array([sorted(tuple(zip(unique, counts)), key=lambda x: x[1], reverse=True)[0][0]])
-                        prediction = np.round(prediction.mean(axis=0))
+                        # prediction = np.round(prediction.mean(axis=0))
+                        prediction = np.any(prediction, axis=0).astype(np.float32)
 
                     else:
                         prediction = prediction.mean(axis=0)

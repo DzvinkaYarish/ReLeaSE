@@ -140,7 +140,7 @@ class Reinforcement(object):
                 else:
                     if isinstance(self.predictor, list):
 
-                        reward, distinct_rwds = self.get_reward(self, self.args, trajectory[1:-1],
+                        reward, distinct_rwds = self.get_reward(self.args, trajectory[1:-1],
                                                                 self.predictor,
                                                                 **kwargs)
                     else:
@@ -206,6 +206,7 @@ class Reinforcement(object):
                                            grad_clipping)
 
         self.generator.optimizer.step()
+
 
         return total_reward, rl_loss.item(), batch_distinct_rewards
 
