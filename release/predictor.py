@@ -208,7 +208,7 @@ class VanillaQSAR(object):
                 if average:
                     if self.model_type == 'classifier':
 
-                        prediction = np.round(prediction.mean(axis=0))
+                        prediction = np.round(prediction.mean(axis=0)).astype(np.float32)
 
                     else:
                         prediction = prediction.mean(axis=0)
