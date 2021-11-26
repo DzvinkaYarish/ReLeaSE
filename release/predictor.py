@@ -122,8 +122,14 @@ class VanillaQSAR(object):
                     raise RuntimeError()
             return eval_metrics, self.metrics_type
 
-        # elif model_class == 'NN':
-        #     pass
+        def i_th_model_predict(self, i, x):
+
+            m = self.model[i]
+            if self.normalization:
+                x, _ = normalize_desc(x, self.desc_mean[i])
+
+                x = Pool(x)
+            return m.predict(x)
 
 
     def load_model(self, path):
