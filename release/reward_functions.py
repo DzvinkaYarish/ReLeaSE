@@ -84,30 +84,38 @@ def get_multi_reward_ranges_multiple_ic50_smiles(args, smiles, predictors, inval
 
     for i, p_name_, p in zip(range(len(predictors_names)), predictors_names, predictors):
 
-        mol, prop, nan_smiles = p.predict([smiles], get_features=get_features)
+        mol, prop, nan_smiles = p.predict(smiles, get_features=get_features)
 
-        if len(nan_smiles) == 1:
-            return invalid_reward, [invalid_reward] * len(predictors)
+        if len(nan_smiles) > 0:
+            print('NAN smiles in prediction')
+            # return invalid_reward, [invalid_reward] * len(predictors)
         if p_name_ == 'IC50':  # ic50
-            rwds.append(np.exp((prop[0] - 5) / 3.))
+            rwds.append(np.exp((prop - 5) / 3.))
         elif p_name_ == 'jak1_binary': #binds/doesn't bind to jak1
-            rwds.append(0. if (prop[0] == 0.) else -2.)
+            dstnctv_rwds = np.zeros((len(prop),), dtype=np.float32)
+            dstnctv_rwds[np.where(prop != 0)] = -2.
+            rwds.append(dstnctv_rwds)
         elif p_name_ == 'jak3_binary': #binds/doesn't bind to jak1
-            rwds.append(0. if (prop[0] == 0.) else -2.)
-        elif p_name_ == 'logP':  # logp
-            rwds.append(2. if ((prop[0] > 1.) and (prop[0] < 4.)) else 0.)
-        elif p_name_ == 'mpC':  # mpt  ??????? == mpC ?????
-            p = (prop[0] * 93.92472573003356) + 92.0924114641032
-            rwds.append(2. if ((p >= 50.) and (p <= 250.0)) else 0.)
+            dstnctv_rwds = np.zeros((len(prop),), dtype=np.float32)
+            dstnctv_rwds[np.where(prop != 0)] = -2.
+            rwds.append(dstnctv_rwds)
+        elif p_name_ == 'logP':
+            dstnctv_rwds = np.zeros((len(prop),), dtype=np.float32)
+            dstnctv_rwds[(prop > 1.) & (prop < 4.)] = 2.
+            rwds.append(dstnctv_rwds)
+        elif p_name_ == 'mpC':
+            p = (prop * 93.92472573003356) + 92.0924114641032
+            dstnctv_rwds = np.zeros((len(p),), dtype=np.float32)
+            dstnctv_rwds[(p > 50.) & (p < 250.)] = 2.
+            rwds.append(dstnctv_rwds)
         else:  # mw
-            if ((prop[0] > 180.) and (prop[0] < 450.)):
-                rwds.append(2)
-            elif prop[0] < 180.:
-                rwds.append(-1.)
-            else:
-                rwds.append(0.)
+            dstnctv_rwds = np.zeros((len(prop),), dtype=np.float32)
+            dstnctv_rwds[(prop > 180.) & (prop < 450.)] = 2.
+            dstnctv_rwds[(prop < 180.)] = -1.
 
-    return np.sum(rwds), rwds
+            rwds.append(dstnctv_rwds)
+
+    return np.sum(np.array(rwds), axis=0), np.array(rwds).reshape(-1, len(predictors_names))
 
 
 

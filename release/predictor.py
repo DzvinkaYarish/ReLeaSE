@@ -2,7 +2,8 @@ from __future__ import print_function
 from __future__ import division
 import numpy as np
 
-from joblib import Parallel
+import joblib
+from joblib import Parallel, delayed
 from sklearn import metrics
 from rdkit import Chem
 from rdkit.Chem import Descriptors
@@ -169,12 +170,8 @@ class VanillaQSAR(object):
                 prediction = []
                 invalid_objects = objects
             else:
-                prediction = []
-                for i in range(self.ensemble_size):
-                    m = self.model[i]
-                    if self.normalization:
-                        x, _ = normalize_desc(x, self.desc_mean[i])
-                    prediction.append(m.predict(x))
+                prediction = Parallel(n_jobs=self.ensemble_size, prefer="threads")(
+                    delayed(self.i_th_model_predict)(i, x) for i in range(self.ensemble_size))
                 prediction = np.array(prediction)
                 if average:
                     if self.model_type == 'classifier':

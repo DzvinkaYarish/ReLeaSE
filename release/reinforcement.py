@@ -107,60 +107,70 @@ class Reinforcement(object):
         rl_loss = 0
         self.generator.optimizer.zero_grad()
         total_reward = 0
-        batch_distinct_rewards = []
-        batch_rewards = []
 
         trajectories = []
         fngps = []
-        for _ in range(n_batch):
+        # for _ in range(n_batch):
+            #
+            # # Sampling new trajectory
+            # reward = 0
+            # trajectory = '<>'
+            # while reward == 0:
+            #     trajectory = self.generator.evaluate(data)
+            #     if std_smiles:
+            #             mol = Chem.MolFromSmiles(trajectory[1:-1])
+            #             if mol:
+            #                 fngp = mol2image(mol)
+            #                 fngps.append(fngp)
+            #                 trajectory = '<' + Chem.MolToSmiles(mol) + '>'
+            #                 if isinstance(self.predictor, list):
+            #                     reward, distinct_rwds = self.get_reward(self, self.args, [mol], np.expand_dims(fngp, axis=0),
+            #                                                             self.predictor,
+            #                                                             **kwargs)
+            #                 else:
+            #                     reward = self.get_reward(self.args, trajectory[1:-1],
+            #                                              self.predictor,
+            #                                              **kwargs)
+            #                     distinct_rwds = []
+            #
+            #             else:
+            #                 reward = 0
+            #     else:
+            #         if isinstance(self.predictor, list):
+            #
+            #             reward, distinct_rwds = self.get_reward(self.args, trajectory[1:-1],
+            #                                                     self.predictor,
+            #                                                     **kwargs)
+            #         else:
+            #             reward = self.get_reward(self.args, trajectory[1:-1],
+            #                                      self.predictor,
+            #                                      **kwargs)
+            #             distinct_rwds = []
+            #
+            # batch_rewards.append(reward)
+            # if distinct_rwds:
+            #     batch_distinct_rewards.append(distinct_rwds)
+            #
+            # trajectories.append(trajectory)
 
-            # Sampling new trajectory
-            reward = 0
-            trajectory = '<>'
-            while reward == 0:
+        while len(trajectories) != n_batch:
                 trajectory = self.generator.evaluate(data)
-                if std_smiles:
-                        mol = Chem.MolFromSmiles(trajectory[1:-1])
-                        if mol:
-                            fngp = mol2image(mol)
-                            fngps.append(fngp)
-                            trajectory = '<' + Chem.MolToSmiles(mol) + '>'
-                            if isinstance(self.predictor, list):
-                                reward, distinct_rwds = self.get_reward(self, self.args, [mol], np.expand_dims(fngp, axis=0),
-                                                                        self.predictor,
-                                                                        **kwargs)
-                            else:
-                                reward = self.get_reward(self.args, trajectory[1:-1],
-                                                         self.predictor,
-                                                         **kwargs)
-                                distinct_rwds = []
+                mol = Chem.MolFromSmiles(trajectory[1:-1])
+                if mol:
+                    trajectories.append(trajectory[1:-1])
 
-                        else:
-                            reward = 0
-                else:
-                    if isinstance(self.predictor, list):
 
-                        reward, distinct_rwds = self.get_reward(self.args, trajectory[1:-1],
-                                                                self.predictor,
-                                                                **kwargs)
-                    else:
-                        reward = self.get_reward(self.args, trajectory[1:-1],
-                                                 self.predictor,
-                                                 **kwargs)
-                        distinct_rwds = []
 
-            batch_rewards.append(reward)
-            if distinct_rwds:
-                batch_distinct_rewards.append(distinct_rwds)
-
-            trajectories.append(trajectory)
 
         end_of_batch_rewards = np.zeros((n_batch,))
 
         if self.get_end_of_batch_reward:
-            fngps = [mol2image(Chem.MolFromSmiles(tr[1:-1])) for tr in trajectories]
+            fngps = [mol2image(Chem.MolFromSmiles(tr)) for tr in trajectories]
 
             end_of_batch_rewards = self.get_end_of_batch_reward(fngps)
+
+        batch_rewards, batch_distinct_rewards = self.get_reward(self.args, trajectories, self.predictor, **kwargs)
+
 
 
         for j, tr in enumerate(trajectories):
