@@ -2,7 +2,7 @@ from __future__ import print_function
 from __future__ import division
 import numpy as np
 
-import joblib
+from joblib import Parallel
 from sklearn import metrics
 from rdkit import Chem
 from rdkit.Chem import Descriptors
@@ -122,14 +122,14 @@ class VanillaQSAR(object):
                     raise RuntimeError()
             return eval_metrics, self.metrics_type
 
-        def i_th_model_predict(self, i, x):
+    def i_th_model_predict(self, i, x):
 
-            m = self.model[i]
-            if self.normalization:
-                x, _ = normalize_desc(x, self.desc_mean[i])
+        m = self.model[i]
+        if self.normalization:
+            x, _ = normalize_desc(x, self.desc_mean[i])
 
-                x = Pool(x)
-            return m.predict(x)
+            x = Pool(x)
+        return m.predict(x)
 
 
     def load_model(self, path):
@@ -201,21 +201,14 @@ class VanillaQSAR(object):
                 prediction = []
                 invalid_objects = objects
             else:
-                prediction = []
-                for i in range(self.ensemble_size):
-                    m = self.model[i]
-                    if self.normalization:
-                        x, _ = normalize_desc(x, self.desc_mean[i])
+                prediction = Parallel(n_jobs=self.ensemble_size, prefer="threads")(
+                    self.i_th_model_predict(i, x) for i in range(self.ensemble_size))
 
-                        x = Pool(x)
-                    prediction.append(m.predict(x))
                 prediction = np.array(prediction)
                 if average:
                     if self.model_type == 'classifier':
-                        # unique, counts = np.unique(prediction, return_counts=True)
-                        # prediction = np.array([sorted(tuple(zip(unique, counts)), key=lambda x: x[1], reverse=True)[0][0]])
-                        # prediction = np.round(prediction.mean(axis=0))
-                        prediction = np.any(prediction, axis=0).astype(np.float32)
+
+                        prediction = np.round(prediction.mean(axis=0))
 
                     else:
                         prediction = prediction.mean(axis=0)
