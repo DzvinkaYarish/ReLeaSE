@@ -2,7 +2,7 @@ from __future__ import print_function
 from __future__ import division
 import numpy as np
 
-from joblib import Parallel
+from joblib import Parallel, delayed
 from sklearn import metrics
 from rdkit import Chem
 from rdkit.Chem import Descriptors
@@ -202,7 +202,7 @@ class VanillaQSAR(object):
                 invalid_objects = objects
             else:
                 prediction = Parallel(n_jobs=self.ensemble_size, prefer="threads")(
-                    self.i_th_model_predict(i, x) for i in range(self.ensemble_size))
+                    delayed(self.i_th_model_predict)(i, x) for i in range(self.ensemble_size))
 
                 prediction = np.array(prediction)
                 if average:
