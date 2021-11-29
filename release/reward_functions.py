@@ -37,6 +37,9 @@ def get_end_of_batch_reward_tanimoto_sim(fngps):
 
     return rwd
 
+def get_multi_reward_ranges_multiple_ic50_clf_and_reg():
+
+
 
 
 def get_multi_reward_ranges_multiple_ic50(rl, args, mols, fngps, predictors, get_features, invalid_reward=0.0):
@@ -108,7 +111,6 @@ def get_multi_reward_ranges_multiple_ic50_smiles(args, smiles, predictors, inval
                 rwds.append(0.)
 
     return np.sum(rwds), rwds
-
 
 
 
@@ -228,66 +230,6 @@ def get_multi_reward_ranges_max_ic50(rl, args, mols, fngps, predictors, invalid_
                 rwds.append(0.)
     return np.sum(rwds), rwds
 
-
-def get_multi_reward_with_mpt(args, smiles, predictors, invalid_reward=0.0, get_features=get_fp):
-    rwds = []
-    predictors_names = [i['name'] for i in args.objectives_names_and_paths]
-
-    stats = [[6.571506827780664, 0.405556162912055], [2.3744083807347933, 0.9429912852261682],
-             [153.76311716715495, 33.472182703355514]]
-
-    for i, p_name_, p in zip(range(len(predictors_names)), predictors_names, predictors):
-        mol, prop, nan_smiles = p.predict([smiles], get_features=get_features)
-
-        if len(nan_smiles) == 1:
-            return invalid_reward, [invalid_reward] * len(predictors)
-        if p_name_ == 'mpC':  # mpt  ??????? == mpC ?????
-            p = (prop[0] * 93.92472573003356) + 92.0924114641032
-            rwds.append(np.exp((p - stats[i][0]) / stats[i][1]))
-        elif p_name_ == 'IC50':  # ic50
-            rwds.append(np.exp(-(prop[0] - stats[i][0]) / stats[i][1]))
-        else:
-            rwds.append(np.exp((prop[0] - stats[i][0]) / stats[i][1]))
-    return np.sum(rwds), rwds
-
-
-def get_multi_reward_with_mw(args, smiles, predictors, invalid_reward=0.0, get_features=get_fp):
-    rwds = []
-    predictors_names = [i['name'] for i in args.objectives_names_and_paths]
-
-    stats = [[6.571506827780664, 0.405556162912055], [2.3744083807347933, 0.9429912852261682]]
-
-    for i, p_name_, p in zip(range(len(predictors_names)), predictors_names, predictors):
-        # FIX WITH I=... , but name of predictors -->
-        mol, prop, nan_smiles = p.predict([smiles], get_features=get_features)
-
-        if len(nan_smiles) == 1:
-            return invalid_reward, [invalid_reward] * len(predictors)
-        if p_name_ == 'mw':  # mw
-            rwds.append(2. if (prop[0] > 180. and prop[0] < 450.) else 0.)
-        elif p_name_ == 'IC50':  # ic50
-            rwds.append(np.exp(-(prop[0] - stats[i][0]) / stats[i][1]))
-        else:
-            rwds.append(np.exp((prop[0] - stats[i][0]) / stats[i][1]))
-    return np.sum(rwds), rwds
-
-
-def get_multi_reward(args, smiles, predictors, invalid_reward=0.0, get_features=get_fp):
-    rwds = []
-    predictors_names = [i['name'] for i in args.objectives_names_and_paths]
-    stats = [[6.571506827780664, 0.405556162912055], [2.3744083807347933, 0.9429912852261682],
-             [153.76311716715495, 33.472182703355514]]
-    #     stats = [[0,1]]
-    for i, p_name_, p in zip(range(len(predictors_names)), predictors_names, predictors):
-        print(smiles)
-        mol, prop, nan_smiles = p.predict([smiles], get_features=get_features)
-
-        if len(nan_smiles) == 1:
-            return invalid_reward, [invalid_reward] * len(predictors)
-        rwds.append(np.exp((prop[0] - stats[i][0]) / stats[i][1]))
-    return np.sum(rwds), rwds
-
-
 def get_range_reward(args, smiles, predictors, invalid_reward=0.0, get_features=get_fp):
 
     predictors_names = [i['name'] for i in args.objectives_names_and_paths]
@@ -345,16 +287,16 @@ def get_reward_func(args):
     :return: A metric function which takes as arguments a list of targets and a list of predictions and returns.
     """
     metric = args.reward_func
-    if metric == 'multi_reward': return get_multi_reward
     if metric == 'range_reward': return get_range_reward
-    if metric == 'multi_reward_with_mw': return get_multi_reward_with_mw
+
+    if metric == 'multi_reward_ranges_max_ic50_similarity_penalty': return get_multi_reward_ranges_max_ic50_similarity_penalty
+
     if metric == 'multi_reward_ranges_max_ic50': return get_multi_reward_ranges_max_ic50
     if metric == 'multi_reward_ranges_max_ic50_smiles': return get_multi_reward_ranges_max_ic50_smiles
 
-    if metric == 'multi_reward_with_mpt': return get_multi_reward_with_mpt
     if metric == 'reward_max_ic50': return get_reward_max_ic50
     if metric == 'reward_max_ic50_smiles': return get_reward_max_ic50_smiles
-    if metric == 'multi_reward_ranges_max_ic50_similarity_penalty': return get_multi_reward_ranges_max_ic50_similarity_penalty
+
     if metric == 'multi_reward_ranges_multiple_ic50': return get_multi_reward_ranges_multiple_ic50
     if metric == 'multi_reward_ranges_multiple_ic50_smiles': return get_multi_reward_ranges_multiple_ic50_smiles
 
