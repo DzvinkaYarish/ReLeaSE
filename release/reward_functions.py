@@ -1,5 +1,5 @@
 import numpy as np
-from utils import get_fp, get_fp_and_mol, get_ECFP, normalize_fp
+from utils import get_fp, get_fp_and_mol, get_ECFP, normalize_fp, mol2image
 from predictor import PROPERTY_PREDICTORS
 
 from rdkit import Chem
@@ -37,9 +37,86 @@ def get_end_of_batch_reward_tanimoto_sim(fngps):
 
     return rwd
 
-def get_multi_reward_ranges_multiple_ic50_clf_and_reg():
+def get_multi_reward_ranges_multiple_ic50_smiles_clf_and_reg(args, smiles, predictors, invalid_reward=0.0, get_features=get_fp):
+    rwds = []
+    predictors_names = [i['name'] for i in args.objectives_names_and_paths]
+    indx_to_predict = np.arange(0, len(smiles))
+
+    fngps = [mol2image(sm) for sm in smiles]
 
 
+    for i, p_name_, p in zip(range(len(predictors_names)), predictors_names, predictors):
+        if p_name_ in PROPERTY_PREDICTORS:
+            mol, prop, nan_smiles = p.predict([smiles[i] for i in indx_to_predict], get_features=None)
+        else:
+            mol, prop, nan_smiles = p.predict([fngps[i] for i in indx_to_predict], get_features=None)
+
+        if len(nan_smiles) > 0:
+            print('NAN smiles in prediction')
+            # return invalid_reward, [invalid_reward] * len(predictors)
+        if p_name_ == 'IC50_clf':  # ic50
+            dstnctv_rwds = np.zeros((len(prop),), dtype=np.float32)
+            dstnctv_rwds[np.where(prop == 0.)] = -1.
+            rwds.append(dstnctv_rwds)
+
+            indx_to_predict = np.where(np.where(prop == 1.))[0]
+        elif p_name_ == 'IC50_reg':  # ic50
+            if len(indx_to_predict) > 0:
+                rwds[-1][np.array(indx_to_predict)] = np.maximum(np.full((len(indx_to_predict),), -1), np.exp(prop - 6) - 2)
+            indx_to_predict = np.arange(0, len(smiles))
+
+
+        elif p_name_ == 'jak1_clf':  # binds/doesn't bind to jak1
+            dstnctv_rwds = np.zeros((len(prop),), dtype=np.float32)
+            dstnctv_rwds[np.where(prop == 0)] = 0.5
+            rwds.append(dstnctv_rwds)
+
+            indx_to_predict = np.where(np.where(prop == 1.))[0]
+        elif p_name_ == 'jak1_reg':  # jak1
+            if len(indx_to_predict) > 0:
+                rwds[-1][np.array(indx_to_predict)] = -0.5 * np.maximum(np.full((len(indx_to_predict),), -1), np.exp(prop - 6) - 2)
+            indx_to_predict = np.arange(0, len(smiles))
+
+
+        elif p_name_ == 'jak3_clf':  # binds/doesn't bind to jak3
+
+            dstnctv_rwds = np.zeros((len(prop),), dtype=np.float32)
+
+            dstnctv_rwds[np.where(prop == 0)] = 0.5
+
+            rwds.append(dstnctv_rwds)
+
+            indx_to_predict = np.where(np.where(prop == 1.))[0]
+
+        elif p_name_ == 'jak3_reg':  # jak3
+            if len(indx_to_predict) > 0:
+
+                rwds[-1][np.array(indx_to_predict)] = -0.5 * np.maximum(np.full((len(indx_to_predict),), -1), np.exp(prop - 6) - 2)
+
+            indx_to_predict = np.arange(0, len(smiles))
+
+
+        elif p_name_ == 'logP':
+            dstnctv_rwds = np.zeros((len(prop),), dtype=np.float32)
+            dstnctv_rwds[(prop > 1.) & (prop < 4.)] = 2.
+            rwds.append(dstnctv_rwds)
+
+
+        elif p_name_ == 'mpC':
+            p = (prop * 93.92472573003356) + 92.0924114641032
+            dstnctv_rwds = np.zeros((len(p),), dtype=np.float32)
+            dstnctv_rwds[(p > 50.) & (p < 250.)] = 2.
+            rwds.append(dstnctv_rwds)
+
+
+        else:  # mw
+            dstnctv_rwds = np.zeros((len(prop),), dtype=np.float32)
+            dstnctv_rwds[(prop > 180.) & (prop < 450.)] = 2.
+            dstnctv_rwds[(prop < 180.)] = -1.
+
+            rwds.append(dstnctv_rwds)
+
+    return np.sum(np.array(rwds), axis=0), np.array(rwds).T
 
 
 def get_multi_reward_ranges_multiple_ic50(rl, args, mols, fngps, predictors, get_features, invalid_reward=0.0):
@@ -118,8 +195,7 @@ def get_multi_reward_ranges_multiple_ic50_smiles(args, smiles, predictors, inval
 
             rwds.append(dstnctv_rwds)
 
-    return np.sum(np.array(rwds), axis=0), np.array(rwds).reshape(-1, len(predictors_names))
-
+    return np.sum(np.array(rwds), axis=0), np.array(rwds).T
 
 
 def calc_sim_ind(sm_list, sim_fngp, normalize_fps):
@@ -307,6 +383,8 @@ def get_reward_func(args):
 
     if metric == 'multi_reward_ranges_multiple_ic50': return get_multi_reward_ranges_multiple_ic50
     if metric == 'multi_reward_ranges_multiple_ic50_smiles': return get_multi_reward_ranges_multiple_ic50_smiles
+
+    if metric == 'multi_reward_ranges_multiple_ic50_smiles_clf_and_reg': return get_multi_reward_ranges_multiple_ic50_smiles_clf_and_reg
 
     if metric == 'empty_reward': return get_empty_reward
     else: raise ValueError(f'Metric "{metric}" not supported.')

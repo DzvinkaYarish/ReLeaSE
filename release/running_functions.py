@@ -56,7 +56,7 @@ def run(args):
             predictor = PropertyPredictor(PROPERTY_PREDICTORS[obj_parameters['name']], obj_parameters['model_type'])
         else:
             model_type = obj_parameters['model_type']
-            p_name = obj_parameters['data_path'].split('/')[-1].split('_')[0]
+            p_name = obj_parameters['data_path'].split('/')[-1].split('.')[0]
             print(p_name)
             # p_name = obj_parameters['name']
 
@@ -117,9 +117,11 @@ def training(args, RL_multi, gen_data, predictors,  unbiased_predictions):
             # cur_reward, cur_loss, cur_distinct_rewards = RL_multi.policy_gradient(gen_data, std_smiles=True, get_features=[None] * len(predictors_names))
             cur_reward, cur_loss, cur_distinct_rewards = RL_multi.policy_gradient(gen_data, std_smiles=False)
 
-
-        for i, p_name in enumerate(predictors_names):
-            writer.add_scalar(f'distinct_rewards/{p_name}', cur_distinct_rewards[i], step)
+        i = 0
+        for p_name in predictors_names:
+            if not 'clf' in p_name:
+                writer.add_scalar(f'distinct_rewards/{p_name}', cur_distinct_rewards[i], step)
+                i += 1
 
         writer.add_scalar(f'distinct_rewards/diversity', cur_distinct_rewards[-1], step)
         writer.add_scalar('final_reward', cur_reward, step)
@@ -133,7 +135,9 @@ def training(args, RL_multi, gen_data, predictors,  unbiased_predictions):
 
         for p_name, p, s, intrv, unbiased_preds in zip(predictors_names, predictors, stats_to_real, intervals, unbiased_predictions):
 
-            if p.model_type == 'classifier':
+            if p.model_type == 'classifier' and not args.store_classifier_plots:
+                continue
+            elif p.model_type == 'classifier':
                 plot_hist(unbiased_preds, p_name)
             else:
                 plot_dist(unbiased_preds, p_name)
@@ -159,7 +163,7 @@ def training(args, RL_multi, gen_data, predictors,  unbiased_predictions):
         if step % 10 == 0:
             save_smiles(args, smiles_cur)
 
-            smiles, prediction_ic50 = predict_and_plot(smiles_cur, predictors[predictors_names.index('IC50')], get_features=get_fp,
+            smiles, prediction_ic50 = predict_and_plot(smiles_cur, predictors[predictors_names.index('IC50_reg')], get_features=get_fp,
                                               p_name='IC50')
             img = draw_smiles(args, smiles, prediction_ic50)
             writer.add_image('Generated SMILES', matplotlib.image.pil_to_array(img), step, dataformats='HWC')

@@ -157,7 +157,7 @@ class Reinforcement(object):
                 trajectory = self.generator.evaluate(data)
                 mol = Chem.MolFromSmiles(trajectory[1:-1])
                 if mol:
-                    trajectories.append(trajectory[1:-1])
+                    trajectories.append(trajectory)
 
 
 
@@ -165,12 +165,10 @@ class Reinforcement(object):
         end_of_batch_rewards = np.zeros((n_batch,))
 
         if self.get_end_of_batch_reward:
-            fngps = [mol2image(Chem.MolFromSmiles(tr)) for tr in trajectories]
+            fngps = [mol2image(Chem.MolFromSmiles(tr[1:-1])) for tr in trajectories]
 
             end_of_batch_rewards = self.get_end_of_batch_reward(fngps)
-
-        batch_rewards, batch_distinct_rewards = self.get_reward(self.args, trajectories, self.predictor, **kwargs)
-
+        batch_rewards, batch_distinct_rewards = self.get_reward(self.args, [tr[1:-1] for tr in trajectories], self.predictor, **kwargs)
 
 
         for j, tr in enumerate(trajectories):
@@ -206,10 +204,10 @@ class Reinforcement(object):
         rl_loss = rl_loss / n_batch
         total_reward = total_reward / n_batch
 
-        for k in range(n_batch):
-            batch_distinct_rewards[k] = batch_distinct_rewards[k] + [end_of_batch_rewards[k]]
 
-        batch_distinct_rewards = np.sum(np.array(batch_distinct_rewards), axis=0) / n_batch
+        batch_distinct_rewards = np.concatenate((batch_distinct_rewards, np.expand_dims(end_of_batch_rewards, axis=1)), axis=1)
+
+        batch_distinct_rewards = np.mean(batch_distinct_rewards, axis=0)
         rl_loss.backward()
         if grad_clipping is not None:
             torch.nn.utils.clip_grad_norm_(self.generator.parameters(),

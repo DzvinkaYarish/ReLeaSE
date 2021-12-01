@@ -177,7 +177,7 @@ class VanillaQSAR(object):
                     if self.model_type == 'classifier':
                         # unique, counts = np.unique(prediction, return_counts=True)
                         # prediction = np.array([sorted(tuple(zip(unique, counts)), key=lambda x: x[1], reverse=True)[0][0]])
-                        prediction = np.round(prediction.mean(axis=0))
+                        prediction = np.any(prediction, axis=0).astype(np.float32)
                     else:
                         prediction = prediction.mean(axis=0)
 
@@ -199,16 +199,17 @@ class VanillaQSAR(object):
                 invalid_objects = objects
             else:
                 prediction = Parallel(n_jobs=self.ensemble_size, prefer="threads")(
-                    self.i_th_model_predict(i, x) for i in range(self.ensemble_size))
+                    delayed(self.i_th_model_predict)(i, x) for i in range(self.ensemble_size))
 
                 prediction = np.array(prediction)
+
                 if average:
                     if self.model_type == 'classifier':
 
-                        prediction = np.round(prediction.mean(axis=0)).astype(np.float32)
-
+                        prediction = np.any(prediction, axis=0).astype(np.float32)
                     else:
                         prediction = prediction.mean(axis=0)
+
 
         return processed_objects, prediction, invalid_objects
 

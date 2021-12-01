@@ -444,10 +444,11 @@ def predict_and_plot(smiles, predictor, p_name, **kwargs):
     get_features = kwargs.get('get_features')
 
     smiles, prediction, nan_smiles = predictor.predict(smiles, get_features=get_features)
-    if predictor.model_type == 'classifier':
-        plot_hist(prediction, p_name, **kwargs)
-    else:
-        plot_dist(prediction, p_name, **kwargs)
+    if len(prediction) > 0:
+        if predictor.model_type == 'classifier':
+            plot_hist(prediction, p_name, **kwargs)
+        else:
+            plot_dist(prediction, p_name, **kwargs)
 
     return smiles, prediction
 
