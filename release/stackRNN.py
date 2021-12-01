@@ -429,7 +429,7 @@ class StackAugmentedRNN(nn.Module):
             sample = list(new_samples[:, i])
             if end_token in sample:
                 end_token_idx = sample.index(end_token)
-                string_samples.append(''.join(sample[1:end_token_idx]))
+                string_samples.append(''.join(sample[:end_token_idx+1]))
         return string_samples
 
     def fit(self, data, batch_size, n_iterations, all_losses=[],

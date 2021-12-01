@@ -23,6 +23,11 @@ def add_parsing_args(parser: ArgumentParser):
     parser.add_argument('--use_cuda', action='store_true')
     parser.add_argument('--n_to_generate', type=int, default=200,
                         help='Number of molecules to generate')
+    parser.add_argument('--batch_size', type=int, default=10,
+                        help='Batch size when doing updates')
+    parser.add_argument('--batch_size_for_generate', type=int, default=10,
+                        help='Batch size when generating molecules')
+
     parser.add_argument('--n_to_draw', type=int, default=20,
                         help='Number of molecules to draw')
 

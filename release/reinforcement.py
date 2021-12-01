@@ -104,7 +104,6 @@ class Reinforcement(object):
             trajectories
 
         """
-        rl_loss = 0
         self.generator.optimizer.zero_grad()
         total_reward = 0
 
@@ -153,11 +152,14 @@ class Reinforcement(object):
             #
             # trajectories.append(trajectory)
 
-        while len(trajectories) != n_batch:
-                trajectory = self.generator.evaluate(data)
-                mol = Chem.MolFromSmiles(trajectory[1:-1])
+        while len(trajectories) < n_batch:
+            batch_trajectories = self.generator.evaluate(data)
+            for tr in batch_trajectories:
+                mol = Chem.MolFromSmiles(tr[1:-1])
                 if mol:
-                    trajectories.append(trajectory)
+                    trajectories.append(tr)
+                if len(trajectories) == n_batch:
+                    break
 
 
 
@@ -171,52 +173,70 @@ class Reinforcement(object):
         batch_rewards, batch_distinct_rewards = self.get_reward(self.args, [tr[1:-1] for tr in trajectories], self.predictor, **kwargs)
 
 
-        for j, tr in enumerate(trajectories):
-
-            # Converting string of characters into tensor
-            trajectory_input = data.char_tensor(tr)
-            discounted_reward = batch_rewards[j] + end_of_batch_rewards[j]
-            total_reward += batch_rewards[j]
-            total_reward += end_of_batch_rewards[j]
 
 
-            # Initializing the generator's hidden state
-            hidden = self.generator.init_hidden()
-            if self.generator.has_cell:
-                cell = self.generator.init_cell()
-                hidden = (hidden, cell)
-            if self.generator.has_stack:
-                stack = self.generator.init_stack()
-            else:
-                stack = None
+        # Converting string of characters into tensor
+        trajectory_input, _ = data.pad_sequences(trajectories, pad_symbol=data.pad_symbol)
+        trajectory_input, _ = data.seq2tensor(trajectory_input, data.tokens, flip=False)
+        trajectory_input = torch.tensor(trajectory_input).long()
+        if self.args.use_cuda:
+            trajectory_input = trajectory_input.cuda()
 
-            # "Following" the trajectory and accumulating the loss
-            for p in range(len(tr) - 1):
-                output, hidden, stack = self.generator(trajectory_input[p],
-                                                       hidden,
-                                                       stack)
-                log_probs = F.log_softmax(output, dim=1)
-                top_i = trajectory_input[p + 1]
-                rl_loss -= (log_probs[0, top_i] * discounted_reward)
-                discounted_reward = discounted_reward * gamma
+        discounted_reward = torch.Tensor(batch_rewards + end_of_batch_rewards).long()
+        if self.args.use_cuda:
+            discounted_reward = discounted_reward.cuda()
+
+        total_reward += np.sum(batch_rewards)
+        total_reward += np.sum(end_of_batch_rewards)
+
+
+        # Initializing the generator's hidden state
+        hidden = self.generator.init_hidden(batch_size=n_batch)
+        if self.generator.has_cell:
+            cell = self.generator.init_cell(batch_size=n_batch)
+            hidden = (hidden, cell)
+        if self.generator.has_stack:
+            stack = self.generator.init_stack(batch_size=n_batch)
+        else:
+            stack = None
+
+        # "Following" the trajectory and accumulating the loss
+        rl_loss = torch.zeros((n_batch,))
+        if self.args.use_cuda:
+            rl_loss = rl_loss.cuda()
+
+        for p in range(trajectory_input.shape[1] - 1):
+            output, hidden, stack = self.generator(trajectory_input[:, p],
+                                                   hidden,
+                                                   stack)
+            indx_terminal = (trajectory_input[:, p] == data.char2idx[data.end_token]) + (trajectory_input[:, p] == data.char2idx[data.pad_symbol])
+            log_probs = F.log_softmax(output, dim=1)
+            top_i = trajectory_input[:, p + 1].detach().numpy()
+
+
+            discounted_reward[indx_terminal] = 0.
+            actual_log_probs = log_probs[np.arange(0, n_batch), top_i]
+
+            rl_loss -= (actual_log_probs * discounted_reward)
+            discounted_reward = discounted_reward * gamma
 
         # Doing backward pass and parameters update
-        rl_loss = rl_loss / n_batch
-        total_reward = total_reward / n_batch
+        rl_loss = rl_loss.mean()
 
-
-        batch_distinct_rewards = np.concatenate((batch_distinct_rewards, np.expand_dims(end_of_batch_rewards, axis=1)), axis=1)
-
-        batch_distinct_rewards = np.mean(batch_distinct_rewards, axis=0)
         rl_loss.backward()
         if grad_clipping is not None:
             torch.nn.utils.clip_grad_norm_(self.generator.parameters(),
                                            grad_clipping)
-
         self.generator.optimizer.step()
 
+        total_reward = total_reward / n_batch
+
+        batch_distinct_rewards = np.concatenate((batch_distinct_rewards, np.expand_dims(end_of_batch_rewards, axis=1)), axis=1)
+
+        batch_distinct_rewards = np.mean(batch_distinct_rewards, axis=0)
 
         return total_reward, rl_loss.item(), batch_distinct_rewards
+
 
     def update_trajectories(self, smiles):
         self.trajectories.extend(smiles)
