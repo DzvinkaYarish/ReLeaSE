@@ -165,7 +165,7 @@ def training(args, RL_multi, gen_data, predictors,  unbiased_predictions):
         if step % 10 == 0:
             save_smiles(args, smiles_cur)
 
-            smiles, prediction_ic50 = predict_and_plot(smiles_cur, predictors[predictors_names.index('IC50_reg')], get_features=get_fp,
+            smiles, prediction_ic50 = predict_and_plot(smiles_cur, predictors[predictors_names.index('IC50')], get_features=get_fp,
                                               p_name='IC50')
             img = draw_smiles(args, smiles, prediction_ic50)
             writer.add_image('Generated SMILES', matplotlib.image.pil_to_array(img), step, dataformats='HWC')
@@ -187,7 +187,7 @@ def get_unbiased_predictions(args, predictors, generator, gen_data):
     stats_to_real = [p['stats_to_real'] for p in args.objectives_names_and_paths]
 
     unbiased_predictions = []
-    smiles, valid_ratio, unique_ratio = generate(generator, 50, gen_data, args.batch_size_for_generate)
+    smiles, valid_ratio, unique_ratio = generate(generator, 500, gen_data, args.batch_size_for_generate)
 
     for p_name, p, s in zip(predictors_names, predictors, stats_to_real):
 

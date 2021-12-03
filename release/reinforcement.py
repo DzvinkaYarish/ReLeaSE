@@ -209,12 +209,12 @@ class Reinforcement(object):
             output, hidden, stack = self.generator(trajectory_input[:, p],
                                                    hidden,
                                                    stack)
+
             indx_terminal = (trajectory_input[:, p] == data.char2idx[data.end_token]) + (trajectory_input[:, p] == data.char2idx[data.pad_symbol])
-            log_probs = F.log_softmax(output, dim=1)
-            top_i = trajectory_input[:, p + 1].detach().numpy()
-
-
             discounted_reward[indx_terminal] = 0.
+
+            log_probs = F.log_softmax(output, dim=1)
+            top_i = trajectory_input[:, p + 1].detach().cpu().numpy()
             actual_log_probs = log_probs[np.arange(0, n_batch), top_i]
 
             rl_loss -= (actual_log_probs * discounted_reward)
