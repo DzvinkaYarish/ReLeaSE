@@ -35,7 +35,7 @@ def run(args):
 
 
     gen_data = GeneratorData(training_data_path=args.generator_data_path, delimiter='\t',
-                         cols_to_read=[0], keep_header=True, tokens=tokens, use_cuda=args.use_cuda)
+                         cols_to_read=[0], keep_header=True, tokens=tokens, use_cuda=args.use_cuda, pad_symbol='+')
 
     my_generator = StackAugmentedRNN(input_size=gen_data.n_characters, hidden_size=args.generator_hidden_size,
                                      output_size=gen_data.n_characters, layer_type=args.generator_layer_type,
@@ -115,7 +115,8 @@ def training(args, RL_multi, gen_data, predictors,  unbiased_predictions):
         for j in trange(args.n_policy, desc='Policy gradient...'):
 
             # cur_reward, cur_loss, cur_distinct_rewards = RL_multi.policy_gradient(gen_data, std_smiles=True, get_features=[None] * len(predictors_names))
-            cur_reward, cur_loss, cur_distinct_rewards = RL_multi.policy_gradient(gen_data, std_smiles=False)
+            cur_reward, cur_loss, cur_distinct_rewards = RL_multi.policy_gradient(gen_data, std_smiles=False,
+                                                                                  n_batch=args.batch_size)
 
         i = 0
         for p_name in predictors_names:
@@ -126,7 +127,8 @@ def training(args, RL_multi, gen_data, predictors,  unbiased_predictions):
         writer.add_scalar(f'distinct_rewards/diversity', cur_distinct_rewards[-1], step)
         writer.add_scalar('final_reward', cur_reward, step)
 
-        smiles_cur, valid_ratio, unique_ratio = generate(RL_multi.generator, args.n_to_generate, gen_data)
+        smiles_cur, valid_ratio, unique_ratio = generate(RL_multi.generator, args.n_to_generate, gen_data,
+                                                         args.batch_size_for_generate)
 
         # if step % args.trajectory_queue_update_freq == 0:
         #     RL_multi.update_trajectories(smiles_cur)
@@ -163,7 +165,7 @@ def training(args, RL_multi, gen_data, predictors,  unbiased_predictions):
         if step % 10 == 0:
             save_smiles(args, smiles_cur)
 
-            smiles, prediction_ic50 = predict_and_plot(smiles_cur, predictors[predictors_names.index('IC50_reg')], get_features=get_fp,
+            smiles, prediction_ic50 = predict_and_plot(smiles_cur, predictors[predictors_names.index('IC50')], get_features=get_fp,
                                               p_name='IC50')
             img = draw_smiles(args, smiles, prediction_ic50)
             writer.add_image('Generated SMILES', matplotlib.image.pil_to_array(img), step, dataformats='HWC')
@@ -185,7 +187,7 @@ def get_unbiased_predictions(args, predictors, generator, gen_data):
     stats_to_real = [p['stats_to_real'] for p in args.objectives_names_and_paths]
 
     unbiased_predictions = []
-    smiles, valid_ratio, unique_ratio = generate(generator, 500, gen_data)
+    smiles, valid_ratio, unique_ratio = generate(generator, 500, gen_data, args.batch_size_for_generate)
 
     for p_name, p, s in zip(predictors_names, predictors, stats_to_real):
 

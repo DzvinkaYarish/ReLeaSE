@@ -401,13 +401,14 @@ def plot_hist(prediction, name, **kwargs):
     plt.title(f'Distribution of predicted {name} for generated molecules')
 
 
-def generate(generator, n_to_generate, gen_data):
+def generate(generator, n_to_generate, gen_data, batch_size):
     generated = []
-    pbar = tqdm(range(n_to_generate))
+    pbar = tqdm(range(np.ceil(n_to_generate / batch_size).astype(np.int64)))
     for i in pbar:
         pbar.set_description("Generating molecules...")
-        generated.append(generator.evaluate(gen_data, predict_len=120)[1:-1])
+        generated.extend(generator.evaluate(gen_data, predict_len=120, batch_size=batch_size))
 
+    generated = [sm[1:-1] for sm in generated[:n_to_generate]]
     sanitized = canonical_smiles(generated, sanitize=True, throw_warning=False)[:-1]
 
     valid_num = (n_to_generate - sanitized.count(''))
