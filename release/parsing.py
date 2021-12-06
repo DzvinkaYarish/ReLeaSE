@@ -28,7 +28,7 @@ def add_parsing_args(parser: ArgumentParser):
     parser.add_argument('--batch_size_for_generate', type=int, default=10,
                         help='Batch size when generating molecules')
 
-    parser.add_argument('--n_to_draw', type=int, default=20,
+    parser.add_argument('--n_to_draw', type=int, default=30,
                         help='Number of molecules to draw')
 
     parser.add_argument('--n_policy_replay', type=int, default = 10,
@@ -50,30 +50,30 @@ def add_parsing_args(parser: ArgumentParser):
                         help='Number of objectives')
 
     parser.add_argument('--objectives_names_and_paths', type=list, default = [
-        {'name': 'IC50', 'model_class': 'RFR', 'interval': [2, 4], 'model_type': 'regressor',
-         'data_path': '/home/dzvinka/ReLeaSE/data/jak2chembl.csv', 'model_params': {'n_estimators': 250, 'n_jobs': 10, },
-         'stats_to_norm': [0., 1.], 'stats_to_real': [0, 1]},
+        # {'name': 'IC50', 'model_class': 'RFR', 'interval': [2, 4], 'model_type': 'regressor',
+        #  'data_path': '/home/dzvinka/ReLeaSE/data/jak2chembl.csv', 'model_params': {'n_estimators': 250, 'n_jobs': 10, },
+        #  'stats_to_norm': [0., 1.], 'stats_to_real': [0, 1]},
 
         # {'name': 'IC50_clf', 'model_class': 'CatBoost', 'interval': None, 'model_type': 'classifier',
         #  'data_path': '/home/dzvinka/ReLeaSE/data/jak2_binary.csv', 'model_params': {},
         #  'stats_to_norm': [0, 1], 'stats_to_real': [0, 1]},
-        # {'name': 'IC50_reg', 'model_class': 'CatBoost', 'interval': None, 'model_type': 'regressor',
-        #  'data_path': '/home/dzvinka/ReLeaSE/data/jak2_regression.csv', 'model_params': {},
-        #  'stats_to_norm': [0, 1], 'stats_to_real': [0, 1]},
-        #
-        # {'name': 'jak1_clf', 'model_class': 'CatBoost', 'interval': None, 'model_type': 'classifier',
-        #  'data_path': '/home/dzvinka/ReLeaSE/data/jak1_binary.csv', 'model_params': {},
-        #  'stats_to_norm': [0,  1], 'stats_to_real': [0, 1]},
-        # {'name': 'jak1_reg', 'model_class': 'CatBoost', 'interval': None, 'model_type': 'regressor',
-        #  'data_path': '/home/dzvinka/ReLeaSE/data/jak1_regression.csv', 'model_params': {},
-        #  'stats_to_norm': [0, 1], 'stats_to_real': [0, 1]},
-        #
-        # {'name': 'jak3_clf', 'model_class': 'CatBoost', 'interval': None, 'model_type': 'classifier',
-        #  'data_path': '/home/dzvinka/ReLeaSE/data/jak3_binary.csv', 'model_params': {},
-        #  'stats_to_norm': [0, 1], 'stats_to_real': [0, 1]},
-        # {'name': 'jak3_reg', 'model_class': 'CatBoost', 'interval': None, 'model_type': 'regressor',
-        #  'data_path': '/home/dzvinka/ReLeaSE/data/jak3_regression.csv', 'model_params': {},
-        #  'stats_to_norm': [0, 1], 'stats_to_real': [0, 1]},
+        {'name': 'IC50_reg', 'model_class': 'CatBoost', 'interval': None, 'model_type': 'regressor',
+         'data_path': '/home/dzvinka/ReLeaSE/data/jak2_regression.csv', 'model_params': {},
+         'stats_to_norm': [0, 1], 'stats_to_real': [0, 1]},
+
+        {'name': 'jak1_clf', 'model_class': 'CatBoost', 'interval': None, 'model_type': 'classifier',
+         'data_path': '/home/dzvinka/ReLeaSE/data/jak1_binary.csv', 'model_params': {},
+         'stats_to_norm': [0,  1], 'stats_to_real': [0, 1]},
+        {'name': 'jak1_reg', 'model_class': 'CatBoost', 'interval': None, 'model_type': 'regressor',
+         'data_path': '/home/dzvinka/ReLeaSE/data/jak1_regression.csv', 'model_params': {},
+         'stats_to_norm': [0, 1], 'stats_to_real': [0, 1]},
+
+        {'name': 'jak3_clf', 'model_class': 'CatBoost', 'interval': None, 'model_type': 'classifier',
+         'data_path': '/home/dzvinka/ReLeaSE/data/jak3_binary.csv', 'model_params': {},
+         'stats_to_norm': [0, 1], 'stats_to_real': [0, 1]},
+        {'name': 'jak3_reg', 'model_class': 'CatBoost', 'interval': None, 'model_type': 'regressor',
+         'data_path': '/home/dzvinka/ReLeaSE/data/jak3_regression.csv', 'model_params': {},
+         'stats_to_norm': [0, 1], 'stats_to_real': [0, 1]},
 
 
 
@@ -117,6 +117,13 @@ def add_parsing_args(parser: ArgumentParser):
                         help='Indicator whether to store the visualisations during training.')
     parser.add_argument('--store_classifier_plots', type=bool, default=True,
                         help='Whether to plot binary predictions.')
+
+    parser.add_argument('--experience_buffer_path', type=str, default='',
+                        help='Path to the csv file which contains known active molecules.')
+    parser.add_argument('--normalize_rewards', type=bool, default=False,
+                        help='Whether to normalize the final reward')
+    parser.add_argument('--add_experience_to_buffer', type=bool, default=False,
+                        help='Whether to add successful trajectories to the replay buffer')
 
 
 
