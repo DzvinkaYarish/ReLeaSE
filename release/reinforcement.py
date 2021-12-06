@@ -168,7 +168,7 @@ class Reinforcement(object):
                                                                 self.predictor, **kwargs)
         n_to_sample = 0
         if self.experience_buffer: #replace the most inactive to jak2 molecules in the batch with known active
-            n_to_sample = max(0, int(n_batch * ((np.sum(batch_distinct_rewards[:, 0] < 1.5)) / n_batch) - 2.))
+            n_to_sample = max(1, int(n_batch * ((np.sum(batch_distinct_rewards[:, 0] < 2.)) / n_batch) - 3.))
             if n_to_sample > 0:
                 samples = [self.experience_buffer[i] for i in np.random.randint(0, len(self.experience_buffer), n_to_sample)]
                 sample_rewards, sample_distinct_rewards = self.get_reward(self.args, samples,

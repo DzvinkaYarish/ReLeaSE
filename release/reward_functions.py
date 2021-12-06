@@ -66,6 +66,13 @@ def get_multi_reward_ranges_multiple_ic50_smiles_clf_and_reg(args, smiles, predi
         if p_name_ == 'IC50_reg':  # ic50
             rwds.append(np.exp((prop - 5) / 3.))
 
+        # elif p_name_ == 'IC50_clf':  # ic50
+        #     if len(indx_to_predict) > 0:
+        #         rwds[-1][np.array(indx_to_predict)][np.where(prop == 1.)] = np.exp(6. - 5.) / 3.
+        #     indx_to_predict = np.arange(0, len(smiles))
+
+
+
         elif p_name_ == 'jak1_clf':  # binds/doesn't bind to jak1
             dstnctv_rwds = np.zeros((len(prop),), dtype=np.float32)
             dstnctv_rwds[np.where(prop == 0)] = 0.5
