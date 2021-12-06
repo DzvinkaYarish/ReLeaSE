@@ -55,8 +55,11 @@ class Reinforcement(object):
         self.predictor = predictor
         self.get_reward = get_reward
         self.get_end_of_batch_reward = get_end_of_batch_reward
+
         self.trajectories = collections.deque(maxlen=500)
         self.similarity_fingerprint = np.zeros((2048, ))
+
+        self.init_experience_buffer()
 
 
     def policy_gradient(self, data, n_batch=10, gamma=0.97,
@@ -161,7 +164,21 @@ class Reinforcement(object):
                 if len(trajectories) == n_batch:
                     break
 
+        batch_rewards, batch_distinct_rewards = self.get_reward(self.args, [tr[1:-1] for tr in trajectories],
+                                                                self.predictor, **kwargs)
+        n_to_sample = 0
+        if self.experience_buffer: #replace the most inactive to jak2 molecules in the batch with known active
+            n_to_sample = max(0, int(n_batch * ((np.sum(batch_distinct_rewards[:, 0] < 1.5)) / n_batch) - 2.))
+            if n_to_sample > 0:
+                samples = [self.experience_buffer[i] for i in np.random.randint(0, len(self.experience_buffer), n_to_sample)]
+                sample_rewards, sample_distinct_rewards = self.get_reward(self.args, samples,
+                                                                          self.predictor, **kwargs)
+                indx_to_replace = batch_distinct_rewards[:, 0].argsort()[:n_to_sample]
 
+                for i, indx in enumerate(indx_to_replace):
+                    trajectories[indx] = '<' + samples[i] + '>'
+                    batch_rewards[indx] = sample_rewards[i]
+                    batch_distinct_rewards[indx] = sample_distinct_rewards[i]
 
 
         end_of_batch_rewards = np.zeros((n_batch,))
@@ -170,9 +187,6 @@ class Reinforcement(object):
             fngps = [mol2image(Chem.MolFromSmiles(tr[1:-1])) for tr in trajectories]
 
             end_of_batch_rewards = self.get_end_of_batch_reward(fngps)
-        batch_rewards, batch_distinct_rewards = self.get_reward(self.args, [tr[1:-1] for tr in trajectories], self.predictor, **kwargs)
-
-
 
 
         # Converting string of characters into tensor
@@ -235,7 +249,7 @@ class Reinforcement(object):
 
         batch_distinct_rewards = np.mean(batch_distinct_rewards, axis=0)
 
-        return total_reward, rl_loss.item(), batch_distinct_rewards
+        return total_reward, rl_loss.item(), batch_distinct_rewards, n_to_sample / n_batch
 
 
     def update_trajectories(self, smiles):
@@ -250,6 +264,14 @@ class Reinforcement(object):
             fp_all += fps[sm]
         fp_all_norm = normalize_fp(fp_all)
         return fp_all_norm
+
+    def init_experience_buffer(self):
+        if self.args.experience_buffer_path:
+            with open(self.args.experience_buffer_path, 'r') as f:
+                self.experience_buffer = [l.strip('\n').strip(',') for l in f.readlines()]
+                self.experience_buffer.pop(0)
+        else:
+            self.experience_buffer = []
 
 
 

@@ -115,7 +115,7 @@ def training(args, RL_multi, gen_data, predictors,  unbiased_predictions):
         for j in trange(args.n_policy, desc='Policy gradient...'):
 
             # cur_reward, cur_loss, cur_distinct_rewards = RL_multi.policy_gradient(gen_data, std_smiles=True, get_features=[None] * len(predictors_names))
-            cur_reward, cur_loss, cur_distinct_rewards = RL_multi.policy_gradient(gen_data, std_smiles=False,
+            cur_reward, cur_loss, cur_distinct_rewards, sampled_from_buff_ratio = RL_multi.policy_gradient(gen_data, std_smiles=False,
                                                                                   n_batch=args.batch_size)
 
         i = 0
@@ -126,6 +126,10 @@ def training(args, RL_multi, gen_data, predictors,  unbiased_predictions):
 
         writer.add_scalar(f'distinct_rewards/diversity', cur_distinct_rewards[-1], step)
         writer.add_scalar('final_reward', cur_reward, step)
+        writer.add_scalar('sampled_from_buff_ratio', sampled_from_buff_ratio, step)
+
+
+
 
         smiles_cur, valid_ratio, unique_ratio = generate(RL_multi.generator, args.n_to_generate, gen_data,
                                                          args.batch_size_for_generate)
@@ -156,21 +160,21 @@ def training(args, RL_multi, gen_data, predictors,  unbiased_predictions):
             plt.savefig(f'{path_to_experiment}/property_dist_{p_name}.png')
             plt.clf()
 
-            if step % 10 == 0:
+            if step % 50 == 0:
                 writer.add_histogram(f'{p_name}_distribution', prediction_cur * s[1] + s[0], step)
 
         writer.add_scalar('valid_smiles_ratio', valid_ratio, step)
         writer.add_scalar('unique_smiles_ratio', unique_ratio, step)
 
-        if step % 10 == 0:
+        if step % 50 == 0:
             save_smiles(args, smiles_cur)
 
-            smiles, prediction_ic50 = predict_and_plot(smiles_cur, predictors[predictors_names.index('IC50')], get_features=get_fp,
+            smiles, prediction_ic50 = predict_and_plot(smiles_cur, predictors[predictors_names.index('IC50_reg')], get_features=get_fp,
                                               p_name='IC50')
             img = draw_smiles(args, smiles, prediction_ic50)
             writer.add_image('Generated SMILES', matplotlib.image.pil_to_array(img), step, dataformats='HWC')
 
-        if step % 50 == 0:
+        if step % 500 == 0:
             RL_multi.generator.save_model(f'{path_to_experiment}/generator_{step}.pth')
 
         e = time.time() - start

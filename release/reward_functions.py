@@ -43,55 +43,54 @@ def get_multi_reward_ranges_multiple_ic50_smiles_clf_and_reg(args, smiles, predi
     indx_to_predict = np.arange(0, len(smiles))
 
     fngps = [mol2image(sm) for sm in smiles]
-
-
     for i, p_name_, p in zip(range(len(predictors_names)), predictors_names, predictors):
         if p_name_ in PROPERTY_PREDICTORS:
-            mol, prop, nan_smiles = p.predict([smiles[i] for i in indx_to_predict], get_features=None)
+            mol, prop, nan_smiles = p.predict([smiles[j] for j in indx_to_predict], get_features=None)
         else:
-            mol, prop, nan_smiles = p.predict([fngps[i] for i in indx_to_predict], get_features=None)
+            mol, prop, nan_smiles = p.predict([fngps[j] for j in indx_to_predict], get_features=None)
 
         if len(nan_smiles) > 0:
             print('NAN smiles in prediction')
             # return invalid_reward, [invalid_reward] * len(predictors)
-        if p_name_ == 'IC50_clf':  # ic50
-            dstnctv_rwds = np.zeros((len(prop),), dtype=np.float32)
-            dstnctv_rwds[np.where(prop == 0.)] = -1.
-            rwds.append(dstnctv_rwds)
+        # if p_name_ == 'IC50_clf':  # ic50
+        #     dstnctv_rwds = np.zeros((len(prop),), dtype=np.float32)
+        #     dstnctv_rwds[np.where(prop == 0.)] = -1.
+        #     rwds.append(dstnctv_rwds)
+        #
+        #     indx_to_predict = np.where(prop == 1.)[0]
+        # elif p_name_ == 'IC50_reg':  # ic50
+        #     if len(indx_to_predict) > 0:
+        #         rwds[-1][np.array(indx_to_predict)] = np.maximum(np.full((len(indx_to_predict),), -1), np.exp(prop - 6) - 2)
+        #     indx_to_predict = np.arange(0, len(smiles))
 
-            indx_to_predict = np.where(np.where(prop == 1.))[0]
-        elif p_name_ == 'IC50_reg':  # ic50
-            if len(indx_to_predict) > 0:
-                rwds[-1][np.array(indx_to_predict)] = np.maximum(np.full((len(indx_to_predict),), -1), np.exp(prop - 6) - 2)
-            indx_to_predict = np.arange(0, len(smiles))
-
+        if p_name_ == 'IC50_reg':  # ic50
+            rwds.append(np.exp((prop - 5) / 3.))
 
         elif p_name_ == 'jak1_clf':  # binds/doesn't bind to jak1
             dstnctv_rwds = np.zeros((len(prop),), dtype=np.float32)
             dstnctv_rwds[np.where(prop == 0)] = 0.5
             rwds.append(dstnctv_rwds)
 
-            indx_to_predict = np.where(np.where(prop == 1.))[0]
+            indx_to_predict = np.where(prop == 1.)[0]
         elif p_name_ == 'jak1_reg':  # jak1
             if len(indx_to_predict) > 0:
-                rwds[-1][np.array(indx_to_predict)] = -0.5 * np.maximum(np.full((len(indx_to_predict),), -1), np.exp(prop - 6) - 2)
+                rwds[-1][np.array(indx_to_predict)] = -0.5 * np.maximum(np.full((len(indx_to_predict),), -1), np.exp(prop - 5) / 3)
             indx_to_predict = np.arange(0, len(smiles))
 
 
         elif p_name_ == 'jak3_clf':  # binds/doesn't bind to jak3
-
             dstnctv_rwds = np.zeros((len(prop),), dtype=np.float32)
 
             dstnctv_rwds[np.where(prop == 0)] = 0.5
 
             rwds.append(dstnctv_rwds)
 
-            indx_to_predict = np.where(np.where(prop == 1.))[0]
+            indx_to_predict = np.where(prop == 1.)[0]
 
         elif p_name_ == 'jak3_reg':  # jak3
             if len(indx_to_predict) > 0:
 
-                rwds[-1][np.array(indx_to_predict)] = -0.5 * np.maximum(np.full((len(indx_to_predict),), -1), np.exp(prop - 6) - 2)
+                rwds[-1][np.array(indx_to_predict)] = -0.5 * np.maximum(np.full((len(indx_to_predict),), -1), np.exp(prop - 5) / 3)
 
             indx_to_predict = np.arange(0, len(smiles))
 
