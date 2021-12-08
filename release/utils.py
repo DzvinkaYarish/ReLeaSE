@@ -465,12 +465,14 @@ def save_smiles(args, smiles_cur):
         f.write('\n')
 
 
-def draw_smiles(args, smiles_cur, prediction_cur):
+def draw_smiles(args, smiles_cur, prediction_cur, labels):
     print(len(smiles_cur))
     print(len(prediction_cur))
+    prediction_cur = np.round(prediction_cur, 2)
     ind = np.random.randint(0, len(smiles_cur), args.n_to_draw)
     mols_to_draw_max = [Chem.MolFromSmiles(smiles_cur[i], sanitize=True) for i in ind]
-    legends = ['pIC50 = ' + str(prediction_cur[i]) for i in ind]
+
+    legends = ['; '.join([f'{labels[j]}={prediction_cur[i][j]}' for j in range(len(labels))]) for i in ind]
 
     img = Draw.MolsToGridImage(mols_to_draw_max, molsPerRow=5,
                                subImgSize=(300, 300), legends=legends)

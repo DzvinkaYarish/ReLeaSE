@@ -107,12 +107,10 @@ class Reinforcement(object):
             trajectories
 
         """
-        self.generator.optimizer.zero_grad()
+
         total_reward = 0
 
         trajectories = []
-
-        mean_rwd
 
 
         while len(trajectories) < n_batch:
@@ -165,45 +163,64 @@ class Reinforcement(object):
         total_reward += np.sum(batch_rewards)
         total_reward += np.sum(end_of_batch_rewards)
 
+        old_log_probs = []
+        clip_fraction = 0
 
-        # Initializing the generator's hidden state
-        hidden = self.generator.init_hidden(batch_size=n_batch)
-        if self.generator.has_cell:
-            cell = self.generator.init_cell(batch_size=n_batch)
-            hidden = (hidden, cell)
-        if self.generator.has_stack:
-            stack = self.generator.init_stack(batch_size=n_batch)
-        else:
-            stack = None
+        for upd_step in self.args.num_update_steps:
+            # Initializing the generator's hidden state
 
-        # "Following" the trajectory and accumulating the loss
-        rl_loss = torch.zeros((n_batch,))
-        if self.args.use_cuda:
-            rl_loss = rl_loss.cuda()
+            hidden = self.generator.init_hidden(batch_size=n_batch)
+            if self.generator.has_cell:
+                cell = self.generator.init_cell(batch_size=n_batch)
+                hidden = (hidden, cell)
+            if self.generator.has_stack:
+                stack = self.generator.init_stack(batch_size=n_batch)
+            else:
+                stack = None
 
-        for p in range(trajectory_input.shape[1] - 1):
-            output, hidden, stack = self.generator(trajectory_input[:, p],
-                                                   hidden,
-                                                   stack)
+            rl_loss = torch.zeros((n_batch,))
+            if self.args.use_cuda:
+                rl_loss = rl_loss.cuda()
 
-            indx_terminal = (trajectory_input[:, p] == data.char2idx[data.end_token]) + (trajectory_input[:, p] == data.char2idx[data.pad_symbol])
-            discounted_reward[indx_terminal] = 0.
+            # "Following" the trajectory and accumulating the loss
+            for p in range(trajectory_input.shape[1] - 1):
+                output, hidden, stack = self.generator(trajectory_input[:, p],
+                                                       hidden,
+                                                       stack)
 
-            log_probs = F.log_softmax(output, dim=1)
-            top_i = trajectory_input[:, p + 1].detach().cpu().numpy()
-            actual_log_probs = log_probs[np.arange(0, n_batch), top_i]
+                indx_terminal = (trajectory_input[:, p] == data.char2idx[data.end_token]) + (trajectory_input[:, p] == data.char2idx[data.pad_symbol])
+                discounted_reward[indx_terminal] = 0.
 
-            rl_loss -= (actual_log_probs * discounted_reward)
-            discounted_reward = discounted_reward * gamma
+                log_probs = F.log_softmax(output, dim=1)
+                top_i = trajectory_input[:, p + 1].detach().cpu().numpy()
+                actual_log_probs = log_probs[np.arange(0, n_batch), top_i]
+                if upd_step == 0:
+                    old_log_probs.append(actual_log_probs.detach())
 
-        # Doing backward pass and parameters update
-        rl_loss = rl_loss.mean()
+                ratios = torch.exp(actual_log_probs - old_log_probs[p])
+                surr1 = ratios * discounted_reward
+                surr2 = torch.clamp(ratios, 1 - self.args.eps_clip, 1 + self.args.eps_clip) * discounted_reward
+                rl_loss -= torch.min(surr1, surr2)
 
-        rl_loss.backward()
-        if grad_clipping is not None:
-            torch.nn.utils.clip_grad_norm_(self.generator.parameters(),
-                                           grad_clipping)
-        self.generator.optimizer.step()
+                if upd_step == 0:
+                    discounted_reward = discounted_reward * gamma
+
+                clipped = ratios.gt(1 + self.args.eps_clip) | ratios.lt(1 - self.args.eps_clip)
+                clip_fraction += torch.as_tensor(clipped, dtype=torch.float32).mean().item()
+
+
+            # useful things to log
+            # approx_kl = (logprobs.detach() - old_logprobs.detach()).mean().item()
+
+
+            # Doing backward pass and parameters update
+            self.generator.optimizer.zero_grad()
+
+            rl_loss = rl_loss.mean()
+
+            rl_loss.backward()
+
+            self.generator.optimizer.step()
 
         total_reward = total_reward / n_batch
 
@@ -211,7 +228,7 @@ class Reinforcement(object):
 
         batch_distinct_rewards = np.mean(batch_distinct_rewards, axis=0)
 
-        return total_reward, rl_loss.item(), batch_distinct_rewards, n_to_sample / n_batch
+        return total_reward, rl_loss.item(), batch_distinct_rewards, n_to_sample / n_batch, clip_fraction / self.args.num_update_steps
 
 
     def update_trajectories(self, smiles):

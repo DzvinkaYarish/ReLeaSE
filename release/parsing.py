@@ -125,6 +125,12 @@ def add_parsing_args(parser: ArgumentParser):
     parser.add_argument('--add_experience_to_buffer', type=bool, default=False,
                         help='Whether to add successful trajectories to the replay buffer')
 
+    parser.add_argument('--num_update_steps', type=int, default=1,
+                        help='Number of subsequent updates to the policy (PPO)')
+    parser.add_argument('--eps_clip', type=float, default=0.2,
+                        help='Epsilon clipping value in PPO')
+
+
 
 
 

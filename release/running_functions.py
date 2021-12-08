@@ -168,10 +168,12 @@ def training(args, RL_multi, gen_data, predictors,  unbiased_predictions):
 
         if step % 50 == 0:
             save_smiles(args, smiles_cur)
+            p_names_to_draw = ['jak1_reg', 'IC50_reg', 'jak2_reg']
+            prediction_ic50 = [predict_and_plot(smiles_cur, predictors[predictors_names.index(n)], get_features=get_fp,
+                                              p_name='IC50')[1] for n in p_names_to_draw]
 
-            smiles, prediction_ic50 = predict_and_plot(smiles_cur, predictors[predictors_names.index('IC50_reg')], get_features=get_fp,
-                                              p_name='IC50')
-            img = draw_smiles(args, smiles, prediction_ic50)
+            prediction_ic50 = [p for p in zip(list(prediction_ic50[0]), list(prediction_ic50[1]), list(prediction_ic50[2]))]
+            img = draw_smiles(args, smiles_cur, prediction_ic50, ['pIC50 jak1', 'pIC50 jak2', 'pIC50 jak3'])
             writer.add_image('Generated SMILES', matplotlib.image.pil_to_array(img), step, dataformats='HWC')
 
         if step % 500 == 0:
