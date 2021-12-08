@@ -111,49 +111,9 @@ class Reinforcement(object):
         total_reward = 0
 
         trajectories = []
-        fngps = []
-        # for _ in range(n_batch):
-            #
-            # # Sampling new trajectory
-            # reward = 0
-            # trajectory = '<>'
-            # while reward == 0:
-            #     trajectory = self.generator.evaluate(data)
-            #     if std_smiles:
-            #             mol = Chem.MolFromSmiles(trajectory[1:-1])
-            #             if mol:
-            #                 fngp = mol2image(mol)
-            #                 fngps.append(fngp)
-            #                 trajectory = '<' + Chem.MolToSmiles(mol) + '>'
-            #                 if isinstance(self.predictor, list):
-            #                     reward, distinct_rwds = self.get_reward(self, self.args, [mol], np.expand_dims(fngp, axis=0),
-            #                                                             self.predictor,
-            #                                                             **kwargs)
-            #                 else:
-            #                     reward = self.get_reward(self.args, trajectory[1:-1],
-            #                                              self.predictor,
-            #                                              **kwargs)
-            #                     distinct_rwds = []
-            #
-            #             else:
-            #                 reward = 0
-            #     else:
-            #         if isinstance(self.predictor, list):
-            #
-            #             reward, distinct_rwds = self.get_reward(self.args, trajectory[1:-1],
-            #                                                     self.predictor,
-            #                                                     **kwargs)
-            #         else:
-            #             reward = self.get_reward(self.args, trajectory[1:-1],
-            #                                      self.predictor,
-            #                                      **kwargs)
-            #             distinct_rwds = []
-            #
-            # batch_rewards.append(reward)
-            # if distinct_rwds:
-            #     batch_distinct_rewards.append(distinct_rwds)
-            #
-            # trajectories.append(trajectory)
+
+        mean_rwd
+
 
         while len(trajectories) < n_batch:
             batch_trajectories = self.generator.evaluate(data)
@@ -197,6 +157,8 @@ class Reinforcement(object):
             trajectory_input = trajectory_input.cuda()
 
         discounted_reward = torch.Tensor(batch_rewards + end_of_batch_rewards).long()
+        if self.args.normalize_rewards:
+            discounted_reward = discounted_reward - np.mean(discounted_reward)
         if self.args.use_cuda:
             discounted_reward = discounted_reward.cuda()
 
