@@ -154,9 +154,9 @@ class Reinforcement(object):
         if self.args.use_cuda:
             trajectory_input = trajectory_input.cuda()
 
-        discounted_reward = torch.Tensor(batch_rewards + end_of_batch_rewards).long()
+        discounted_reward = torch.Tensor(batch_rewards + end_of_batch_rewards).float()
         if self.args.normalize_rewards:
-            discounted_reward = discounted_reward - np.mean(discounted_reward)
+            discounted_reward = discounted_reward - torch.mean(discounted_reward)
         if self.args.use_cuda:
             discounted_reward = discounted_reward.cuda()
 
