@@ -114,7 +114,7 @@ class Reinforcement(object):
 
 
         while len(trajectories) < n_batch:
-            batch_trajectories = self.generator.evaluate(data)
+            batch_trajectories = self.generator.evaluate(data, batch_size=self.args.batch_size_for_generate)
             for tr in batch_trajectories:
                 mol = Chem.MolFromSmiles(tr[1:-1])
                 if mol:
@@ -166,7 +166,7 @@ class Reinforcement(object):
         old_log_probs = []
         clip_fraction = 0
 
-        for upd_step in self.args.num_update_steps:
+        for upd_step in self.args.n_update_steps:
             # Initializing the generator's hidden state
 
             hidden = self.generator.init_hidden(batch_size=n_batch)
@@ -228,7 +228,7 @@ class Reinforcement(object):
 
         batch_distinct_rewards = np.mean(batch_distinct_rewards, axis=0)
 
-        return total_reward, rl_loss.item(), batch_distinct_rewards, n_to_sample / n_batch, clip_fraction / self.args.num_update_steps
+        return total_reward, rl_loss.item(), batch_distinct_rewards, n_to_sample / n_batch, clip_fraction / self.args.n_update_steps
 
 
     def update_trajectories(self, smiles):

@@ -193,7 +193,7 @@ def get_unbiased_predictions(args, predictors, generator, gen_data):
     stats_to_real = [p['stats_to_real'] for p in args.objectives_names_and_paths]
 
     unbiased_predictions = []
-    smiles, valid_ratio, unique_ratio = generate(generator, 500, gen_data, args.batch_size_for_generate)
+    smiles, valid_ratio, unique_ratio = generate(generator, 50, gen_data, args.batch_size_for_generate)
 
     for p_name, p, s in zip(predictors_names, predictors, stats_to_real):
 
