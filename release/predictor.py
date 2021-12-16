@@ -187,6 +187,7 @@ class VanillaQSAR(object):
             invalid_objects = []
             processed_objects = []
             if get_features is not None:
+
                 x, processed_indices, invalid_indices = get_features(objects,
                                                                      **kwargs)
                 processed_objects = objects[processed_indices]

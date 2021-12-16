@@ -28,7 +28,7 @@ def add_parsing_args(parser: ArgumentParser):
     parser.add_argument('--batch_size_for_generate', type=int, default=10,
                         help='Batch size when generating molecules')
 
-    parser.add_argument('--n_to_draw', type=int, default=30,
+    parser.add_argument('--n_to_draw', type=int, default=50,
                         help='Number of molecules to draw')
 
     parser.add_argument('--n_policy_replay', type=int, default = 10,
@@ -56,11 +56,11 @@ def add_parsing_args(parser: ArgumentParser):
 
         # {'name': 'IC50_clf', 'model_class': 'CatBoost', 'interval': None, 'model_type': 'classifier',
         #  'data_path': '/home/dzvinka/ReLeaSE/data/jak2_binary.csv', 'model_params': {},
-        #  'stats_to_norm': [0, 1], 'stats_to_real': [0, 1]},
+        # # #  'stats_to_norm': [0, 1], 'stats_to_real': [0, 1]},
         {'name': 'IC50_reg', 'model_class': 'CatBoost', 'interval': None, 'model_type': 'regressor',
          'data_path': '/home/dzvinka/ReLeaSE/data/jak2_regression.csv', 'model_params': {},
          'stats_to_norm': [0, 1], 'stats_to_real': [0, 1]},
-
+        # #
         {'name': 'jak1_clf', 'model_class': 'CatBoost', 'interval': None, 'model_type': 'classifier',
          'data_path': '/home/dzvinka/ReLeaSE/data/jak1_binary.csv', 'model_params': {},
          'stats_to_norm': [0,  1], 'stats_to_real': [0, 1]},
@@ -125,7 +125,7 @@ def add_parsing_args(parser: ArgumentParser):
     parser.add_argument('--add_experience_to_buffer', type=bool, default=False,
                         help='Whether to add successful trajectories to the replay buffer')
 
-    parser.add_argument('--n_update_steps', type=int, default=1,
+    parser.add_argument('--n_update_steps', type=int, default=5,
                         help='Number of subsequent updates to the policy (PPO)')
     parser.add_argument('--eps_clip', type=float, default=0.2,
                         help='Epsilon clipping value in PPO')

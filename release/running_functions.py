@@ -43,7 +43,7 @@ def run(args):
                                      stack_width=args.generator_stack_width, stack_depth=args.generator_stack_depth,
                                      use_cuda=args.use_cuda,
                                      optimizer_instance=optimizer_instance, lr=args.generator_lr)
-
+    print(f'Loading generator from {args.generator_model_path}')
     my_generator.load_model(args.generator_model_path)
 
     predictors = []
@@ -115,7 +115,7 @@ def training(args, RL_multi, gen_data, predictors,  unbiased_predictions):
         for j in trange(args.n_policy, desc='Policy gradient...'):
 
             # cur_reward, cur_loss, cur_distinct_rewards = RL_multi.policy_gradient(gen_data, std_smiles=True, get_features=[None] * len(predictors_names))
-            cur_reward, cur_loss, cur_distinct_rewards, sampled_from_buff_ratio = RL_multi.policy_gradient(gen_data, std_smiles=False,
+            cur_reward, cur_loss, cur_distinct_rewards, sampled_from_buff_ratio, clip_ratio = RL_multi.policy_gradient(gen_data, std_smiles=False,
                                                                                   n_batch=args.batch_size)
 
         i = 0
@@ -127,6 +127,8 @@ def training(args, RL_multi, gen_data, predictors,  unbiased_predictions):
         writer.add_scalar(f'distinct_rewards/diversity', cur_distinct_rewards[-1], step)
         writer.add_scalar('final_reward', cur_reward, step)
         writer.add_scalar('sampled_from_buff_ratio', sampled_from_buff_ratio, step)
+        writer.add_scalar('clipped_ratio', clip_ratio, step)
+
 
 
 
@@ -166,17 +168,28 @@ def training(args, RL_multi, gen_data, predictors,  unbiased_predictions):
         writer.add_scalar('valid_smiles_ratio', valid_ratio, step)
         writer.add_scalar('unique_smiles_ratio', unique_ratio, step)
 
-        if step % 50 == 0:
+        if step % 10 == 0:
             save_smiles(args, smiles_cur)
-            p_names_to_draw = ['jak1_reg', 'IC50_reg', 'jak2_reg']
-            prediction_ic50 = [predict_and_plot(smiles_cur, predictors[predictors_names.index(n)], get_features=get_fp,
-                                              p_name='IC50')[1] for n in p_names_to_draw]
+            p_names_to_draw = ['jak1_reg', 'jak3_reg']
+            # p_names_to_draw = []
+            prediction_ic50 = []
+            sm, preds = predict_and_plot(smiles_cur, predictors[predictors_names.index('IC50_reg')], get_features=get_fp,
+                                              p_name='IC50_reg')
+            prediction_ic50.append(preds)
+            for n in p_names_to_draw:
+                prediction_ic50.append(predict_and_plot(sm, predictors[predictors_names.index(n)], get_features=get_fp,
+                                 p_name='IC50_reg')[1])
 
-            prediction_ic50 = [p for p in zip(list(prediction_ic50[0]), list(prediction_ic50[1]), list(prediction_ic50[2]))]
-            img = draw_smiles(args, smiles_cur, prediction_ic50, ['pIC50 jak1', 'pIC50 jak2', 'pIC50 jak3'])
+
+            prediction_ic50 = [p for p in zip(*prediction_ic50)]
+
+
+            # img = draw_smiles(args, smiles_cur, prediction_ic50, ['pIC50 jak1', 'pIC50 jak2', 'pIC50 jak3'])
+            img = draw_smiles(args, sm, prediction_ic50, ['pIC50 jak2', 'pIC50 jak1', 'pIC50 jak3'])
+
             writer.add_image('Generated SMILES', matplotlib.image.pil_to_array(img), step, dataformats='HWC')
 
-        if step % 500 == 0:
+        if step % 250 == 0:
             RL_multi.generator.save_model(f'{path_to_experiment}/generator_{step}.pth')
 
         e = time.time() - start
@@ -193,7 +206,7 @@ def get_unbiased_predictions(args, predictors, generator, gen_data):
     stats_to_real = [p['stats_to_real'] for p in args.objectives_names_and_paths]
 
     unbiased_predictions = []
-    smiles, valid_ratio, unique_ratio = generate(generator, 50, gen_data, args.batch_size_for_generate)
+    smiles, valid_ratio, unique_ratio = generate(generator, 500, gen_data, args.batch_size_for_generate)
 
     for p_name, p, s in zip(predictors_names, predictors, stats_to_real):
 

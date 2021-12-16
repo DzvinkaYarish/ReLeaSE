@@ -14,6 +14,7 @@ import numpy as np
 import collections
 from rdkit import Chem
 
+torch.autograd.set_detect_anomaly(True)
 
 from utils import get_ECFP, normalize_fp, mol2image
 
@@ -121,6 +122,10 @@ class Reinforcement(object):
                     trajectories.append(tr)
                 if len(trajectories) == n_batch:
                     break
+        # trajectories = ['<CC(=O)C(=CNc1ccc(F)cc1)c1cc(C)cc(C)c1>',
+        # '<CC(=O)N1CC(C)C(C)C2SCC(C)(C)OC2CC1CO>',
+        #    '<CC(=O)N1CCN(CC(=O)N2CCN(C(=O)OC(C)(C)C)CC2)CC1>',
+        #    '<CC(=O)NC1C#CC(O)=Nc2cc(-c3ccc(Cl)c(Cl)c3)ccc21>']
 
         batch_rewards, batch_distinct_rewards = self.get_reward(self.args, [tr[1:-1] for tr in trajectories],
                                                                 self.predictor, **kwargs)
@@ -157,16 +162,37 @@ class Reinforcement(object):
         discounted_reward = torch.Tensor(batch_rewards + end_of_batch_rewards).float()
         if self.args.normalize_rewards:
             discounted_reward = discounted_reward - torch.mean(discounted_reward)
+        discounted_rewards = torch.zeros((n_batch, trajectory_input.shape[1]))
+        discounted_rewards[:, 0] = discounted_reward
+        for d in range(1, trajectory_input.shape[1]):
+            discounted_rewards[:, d] = discounted_rewards[:, d-1] * gamma
         if self.args.use_cuda:
-            discounted_reward = discounted_reward.cuda()
+            discounted_rewards = discounted_rewards.cuda()
+
+        hidden = self.generator.init_hidden(batch_size=n_batch)
+        if self.generator.has_cell:
+            cell = self.generator.init_cell(batch_size=n_batch)
+            hidden = (hidden, cell)
+        if self.generator.has_stack:
+            stack = self.generator.init_stack(batch_size=n_batch)
+        else:
+            stack = None
+        for p in range(trajectory_input.shape[1] - 1):
+            output, hidden, stack = self.generator(trajectory_input[:, p],
+                                                   hidden,
+                                                   stack)
+
+            indx_terminal = (trajectory_input[:, p] == data.char2idx[data.end_token]) + (
+                        trajectory_input[:, p] == data.char2idx[data.pad_symbol])
+
+            discounted_rewards[indx_terminal, p] = 0.
 
         total_reward += np.sum(batch_rewards)
         total_reward += np.sum(end_of_batch_rewards)
 
         old_log_probs = []
         clip_fraction = 0
-
-        for upd_step in self.args.n_update_steps:
+        for upd_step in range(self.args.n_update_steps):
             # Initializing the generator's hidden state
 
             hidden = self.generator.init_hidden(batch_size=n_batch)
@@ -183,13 +209,13 @@ class Reinforcement(object):
                 rl_loss = rl_loss.cuda()
 
             # "Following" the trajectory and accumulating the loss
+
+
             for p in range(trajectory_input.shape[1] - 1):
                 output, hidden, stack = self.generator(trajectory_input[:, p],
                                                        hidden,
                                                        stack)
 
-                indx_terminal = (trajectory_input[:, p] == data.char2idx[data.end_token]) + (trajectory_input[:, p] == data.char2idx[data.pad_symbol])
-                discounted_reward[indx_terminal] = 0.
 
                 log_probs = F.log_softmax(output, dim=1)
                 top_i = trajectory_input[:, p + 1].detach().cpu().numpy()
@@ -198,12 +224,10 @@ class Reinforcement(object):
                     old_log_probs.append(actual_log_probs.detach())
 
                 ratios = torch.exp(actual_log_probs - old_log_probs[p])
-                surr1 = ratios * discounted_reward
-                surr2 = torch.clamp(ratios, 1 - self.args.eps_clip, 1 + self.args.eps_clip) * discounted_reward
-                rl_loss -= torch.min(surr1, surr2)
+                surr1 = ratios * discounted_rewards[:, p]
+                surr2 = torch.clamp(ratios, 1 - self.args.eps_clip, 1 + self.args.eps_clip) * discounted_rewards[:, p]
 
-                if upd_step == 0:
-                    discounted_reward = discounted_reward * gamma
+                rl_loss -= torch.min(surr1, surr2)
 
                 clipped = ratios.gt(1 + self.args.eps_clip) | ratios.lt(1 - self.args.eps_clip)
                 clip_fraction += torch.as_tensor(clipped, dtype=torch.float32).mean().item()
