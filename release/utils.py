@@ -474,6 +474,6 @@ def draw_smiles(args, smiles_cur, prediction_cur, labels):
 
     legends = ['; '.join([f'{labels[j]}={prediction_cur[i][j]}' for j in range(len(labels))]) for i in ind]
 
-    img = Draw.MolsToGridImage(mols_to_draw_max, molsPerRow=5,
-                               subImgSize=(300, 300), legends=legends)
+    img = Draw.MolsToGridImage(mols_to_draw_max, molsPerRow=4,
+                               subImgSize=(400, 400), legends=legends)
     return img

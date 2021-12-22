@@ -197,6 +197,7 @@ class StackAugmentedRNN(nn.Module):
         next_stack: torch.tensor
             next state of the augmented memory stack
         """
+
         inp = self.encoder(inp)
         if self.has_stack:
             if self.has_cell:
@@ -245,6 +246,7 @@ class StackAugmentedRNN(nn.Module):
 
         """
         batch_size = prev_stack.size(0)
+
 
         controls = controls.view(-1, 3, 1, 1)
         zeros_at_the_bottom = torch.zeros(batch_size, 1, self.stack_width)

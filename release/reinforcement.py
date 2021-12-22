@@ -13,6 +13,7 @@ import torch.nn.functional as F
 import numpy as np
 import collections
 from rdkit import Chem
+from copy import  deepcopy
 
 torch.autograd.set_detect_anomaly(True)
 
@@ -155,82 +156,77 @@ class Reinforcement(object):
         # Converting string of characters into tensor
         trajectory_input, _ = data.pad_sequences(trajectories, pad_symbol=data.pad_symbol)
         trajectory_input, _ = data.seq2tensor(trajectory_input, data.tokens, flip=False)
-        trajectory_input = torch.tensor(trajectory_input).long()
-        if self.args.use_cuda:
-            trajectory_input = trajectory_input.cuda()
+
 
         discounted_reward = torch.Tensor(batch_rewards + end_of_batch_rewards).float()
         if self.args.normalize_rewards:
-            discounted_reward = discounted_reward - torch.mean(discounted_reward)
+            discounted_reward = (discounted_reward - torch.mean(discounted_reward)) / torch.std(discounted_reward)
         discounted_rewards = torch.zeros((n_batch, trajectory_input.shape[1]))
         discounted_rewards[:, 0] = discounted_reward
         for d in range(1, trajectory_input.shape[1]):
             discounted_rewards[:, d] = discounted_rewards[:, d-1] * gamma
+            indx_terminal = (trajectory_input[:, d] == data.char2idx[data.end_token]) + (
+                    trajectory_input[:, d] == data.char2idx[data.pad_symbol])
+
+            discounted_rewards[indx_terminal, d] = 0.
+
         if self.args.use_cuda:
             discounted_rewards = discounted_rewards.cuda()
-
-        hidden = self.generator.init_hidden(batch_size=n_batch)
-        if self.generator.has_cell:
-            cell = self.generator.init_cell(batch_size=n_batch)
-            hidden = (hidden, cell)
-        if self.generator.has_stack:
-            stack = self.generator.init_stack(batch_size=n_batch)
-        else:
-            stack = None
-        for p in range(trajectory_input.shape[1] - 1):
-            output, hidden, stack = self.generator(trajectory_input[:, p],
-                                                   hidden,
-                                                   stack)
-
-            indx_terminal = (trajectory_input[:, p] == data.char2idx[data.end_token]) + (
-                        trajectory_input[:, p] == data.char2idx[data.pad_symbol])
-
-            discounted_rewards[indx_terminal, p] = 0.
 
         total_reward += np.sum(batch_rewards)
         total_reward += np.sum(end_of_batch_rewards)
 
-        old_log_probs = []
+        old_log_probs = torch.zeros((n_batch, trajectory_input.shape[1]))
+        if self.args.use_cuda:
+            old_log_probs = old_log_probs.cuda()
+
         clip_fraction = 0
         for upd_step in range(self.args.n_update_steps):
-            # Initializing the generator's hidden state
 
-            hidden = self.generator.init_hidden(batch_size=n_batch)
-            if self.generator.has_cell:
-                cell = self.generator.init_cell(batch_size=n_batch)
-                hidden = (hidden, cell)
-            if self.generator.has_stack:
-                stack = self.generator.init_stack(batch_size=n_batch)
-            else:
-                stack = None
+            self.generator.optimizer.zero_grad()
 
-            rl_loss = torch.zeros((n_batch,))
-            if self.args.use_cuda:
-                rl_loss = rl_loss.cuda()
+            for b in range(0, n_batch, self.args.batch_size_for_generate):
+                rl_loss = torch.zeros((min(self.args.batch_size_for_generate, trajectory_input.shape[0] - b),))
+                if self.args.use_cuda:
+                    rl_loss = rl_loss.cuda()
+                end = min(trajectory_input.shape[0], b + self.args.batch_size_for_generate)
 
-            # "Following" the trajectory and accumulating the loss
+                hidden = self.generator.init_hidden(batch_size=min(self.args.batch_size_for_generate, trajectory_input.shape[0] - b))
+
+                if self.generator.has_cell:
+                    cell = self.generator.init_cell(batch_size=min(self.args.batch_size_for_generate, trajectory_input.shape[0] - b))
+                    hidden = (hidden, cell)
+                if self.generator.has_stack:
+                    stack = self.generator.init_stack(batch_size=min(self.args.batch_size_for_generate, trajectory_input.shape[0] - b))
+                else:
+                    stack = None
+
+                trajectory_input_batch = torch.tensor(trajectory_input[b:end]).long()
+                if self.args.use_cuda:
+                    trajectory_input_batch = trajectory_input_batch.cuda()
+
+                for p in range(trajectory_input.shape[1] - 1):
+
+                    output, hidden, stack = self.generator(trajectory_input_batch[:, p],
+                                                           hidden,
+                                                           stack)
 
 
-            for p in range(trajectory_input.shape[1] - 1):
-                output, hidden, stack = self.generator(trajectory_input[:, p],
-                                                       hidden,
-                                                       stack)
+                    log_probs = F.log_softmax(output, dim=1)
+                    top_i = trajectory_input_batch[:, p + 1].detach().cpu().numpy()
+                    actual_log_probs = log_probs[np.arange(0, len(log_probs)), top_i]
+                    if upd_step == 0:
+                        old_log_probs[b:end, p] = actual_log_probs.detach()
 
+                    ratios = torch.exp(actual_log_probs - old_log_probs[b:end, p])
+                    surr1 = ratios * discounted_rewards[b:end, p]
+                    surr2 = torch.clamp(ratios, 1 - self.args.eps_clip, 1 + self.args.eps_clip) * \
+                            discounted_rewards[b:end, p]
 
-                log_probs = F.log_softmax(output, dim=1)
-                top_i = trajectory_input[:, p + 1].detach().cpu().numpy()
-                actual_log_probs = log_probs[np.arange(0, n_batch), top_i]
-                if upd_step == 0:
-                    old_log_probs.append(actual_log_probs.detach())
+                    rl_loss -= torch.min(surr1, surr2)
 
-                ratios = torch.exp(actual_log_probs - old_log_probs[p])
-                surr1 = ratios * discounted_rewards[:, p]
-                surr2 = torch.clamp(ratios, 1 - self.args.eps_clip, 1 + self.args.eps_clip) * discounted_rewards[:, p]
-
-                rl_loss -= torch.min(surr1, surr2)
-
-                clipped = ratios.gt(1 + self.args.eps_clip) | ratios.lt(1 - self.args.eps_clip)
-                clip_fraction += torch.as_tensor(clipped, dtype=torch.float32).mean().item()
+                    clipped = ratios.gt(1 + self.args.eps_clip) | ratios.lt(1 - self.args.eps_clip)
+                    clip_fraction += torch.as_tensor(clipped, dtype=torch.float32).mean().item()
 
 
             # useful things to log
@@ -238,11 +234,12 @@ class Reinforcement(object):
 
 
             # Doing backward pass and parameters update
-            self.generator.optimizer.zero_grad()
 
-            rl_loss = rl_loss.mean()
 
-            rl_loss.backward()
+                rl_loss = rl_loss.mean()
+                rl_loss = rl_loss / int(np.ceil(n_batch / self.args.batch_size_for_generate))
+
+                rl_loss.backward()
 
             self.generator.optimizer.step()
 
@@ -252,7 +249,8 @@ class Reinforcement(object):
 
         batch_distinct_rewards = np.mean(batch_distinct_rewards, axis=0)
 
-        return total_reward, rl_loss.item(), batch_distinct_rewards, n_to_sample / n_batch, clip_fraction / self.args.n_update_steps
+        return total_reward, rl_loss.item(), batch_distinct_rewards, n_to_sample / n_batch, \
+        clip_fraction / (self.args.n_update_steps * np.ceil(n_batch / self.args.batch_size_for_generate) * trajectory_input.shape[1] - 1)
 
 
     def update_trajectories(self, smiles):
@@ -275,6 +273,10 @@ class Reinforcement(object):
                 self.experience_buffer.pop(0)
         else:
             self.experience_buffer = []
+
+    def finetune(self, gen_data):
+        self.generator.fit(gen_data, self.args.batch_size_for_generate, self.args.n_finetune, 10000, 10000)
+
 
 
 

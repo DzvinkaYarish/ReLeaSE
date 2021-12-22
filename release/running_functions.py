@@ -117,6 +117,7 @@ def training(args, RL_multi, gen_data, predictors,  unbiased_predictions):
             # cur_reward, cur_loss, cur_distinct_rewards = RL_multi.policy_gradient(gen_data, std_smiles=True, get_features=[None] * len(predictors_names))
             cur_reward, cur_loss, cur_distinct_rewards, sampled_from_buff_ratio, clip_ratio = RL_multi.policy_gradient(gen_data, std_smiles=False,
                                                                                   n_batch=args.batch_size)
+        RL_multi.finetune(gen_data)
 
         i = 0
         for p_name in predictors_names:
@@ -184,7 +185,7 @@ def training(args, RL_multi, gen_data, predictors,  unbiased_predictions):
             prediction_ic50 = [p for p in zip(*prediction_ic50)]
 
 
-            # img = draw_smiles(args, smiles_cur, prediction_ic50, ['pIC50 jak1', 'pIC50 jak2', 'pIC50 jak3'])
+            # img = draw_smiles(args, sm, prediction_ic50, [ 'pIC50 jak2'])
             img = draw_smiles(args, sm, prediction_ic50, ['pIC50 jak2', 'pIC50 jak1', 'pIC50 jak3'])
 
             writer.add_image('Generated SMILES', matplotlib.image.pil_to_array(img), step, dataformats='HWC')

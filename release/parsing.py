@@ -37,6 +37,9 @@ def add_parsing_args(parser: ArgumentParser):
                         help='Number of policies')
     parser.add_argument('--n_iterations', type=int, default = 1000,
                         help='Number of iterations')
+    parser.add_argument('--n_finetune', type=int, default=0,
+                        help='Number of finetuning steps')
+
     parser.add_argument('--trajectory_queue_update_freq', type=int, default=10,
                         help='Update trajectories queue every _ iterations')
     parser.add_argument('--n_estimators_RFR', type=int, default = 250,
