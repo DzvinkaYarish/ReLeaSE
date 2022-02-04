@@ -116,11 +116,11 @@ class GeneratorData(object):
 
     def random_training_set(self, batch_size):
         inp, target = self.random_chunk(batch_size)
-        inp_padded, _ = self.pad_sequences(inp)
+        inp_padded, _ = self.pad_sequences(inp, pad_symbol=self.pad_symbol)
         inp_tensor, self.all_characters = self.seq2tensor(inp_padded,
                                                           tokens=self.all_characters,
                                                           flip=False)
-        target_padded, _ = self.pad_sequences(target)
+        target_padded, _ = self.pad_sequences(target, pad_symbol=self.pad_symbol)
         target_tensor, self.all_characters = self.seq2tensor(target_padded,
                                                              tokens=self.all_characters,
                                                              flip=False)

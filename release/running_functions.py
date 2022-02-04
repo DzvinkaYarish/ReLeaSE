@@ -102,11 +102,7 @@ def training(args, RL_multi, gen_data, predictors,  unbiased_predictions):
 
     with open(f'{path_to_experiment}/config.json', 'w') as f:
         json.dump(vars(args), f)
-
-
-
     writer = SummaryWriter(f'{path_to_experiment}')
-
 
     for step in range(args.n_iterations):
 
@@ -117,7 +113,8 @@ def training(args, RL_multi, gen_data, predictors,  unbiased_predictions):
             # cur_reward, cur_loss, cur_distinct_rewards = RL_multi.policy_gradient(gen_data, std_smiles=True, get_features=[None] * len(predictors_names))
             cur_reward, cur_loss, cur_distinct_rewards, sampled_from_buff_ratio, clip_ratio = RL_multi.policy_gradient(gen_data, std_smiles=False,
                                                                                   n_batch=args.batch_size)
-        RL_multi.finetune(gen_data)
+        if step % args.finetune_freq == 0:
+            RL_multi.finetune(gen_data)
 
         i = 0
         for p_name in predictors_names:
@@ -163,7 +160,7 @@ def training(args, RL_multi, gen_data, predictors,  unbiased_predictions):
             plt.savefig(f'{path_to_experiment}/property_dist_{p_name}.png')
             plt.clf()
 
-            if step % 50 == 0:
+            if step % 10 == 0:
                 writer.add_histogram(f'{p_name}_distribution', prediction_cur * s[1] + s[0], step)
 
         writer.add_scalar('valid_smiles_ratio', valid_ratio, step)
@@ -190,7 +187,7 @@ def training(args, RL_multi, gen_data, predictors,  unbiased_predictions):
 
             writer.add_image('Generated SMILES', matplotlib.image.pil_to_array(img), step, dataformats='HWC')
 
-        if step % 250 == 0:
+        if step % 400 == 0:
             RL_multi.generator.save_model(f'{path_to_experiment}/generator_{step}.pth')
 
         e = time.time() - start

@@ -39,6 +39,8 @@ def add_parsing_args(parser: ArgumentParser):
                         help='Number of iterations')
     parser.add_argument('--n_finetune', type=int, default=0,
                         help='Number of finetuning steps')
+    parser.add_argument('--finetune_freq', type=int, default=100000,
+                        help='Finetune the generator every _ iterations')
 
     parser.add_argument('--trajectory_queue_update_freq', type=int, default=10,
                         help='Update trajectories queue every _ iterations')

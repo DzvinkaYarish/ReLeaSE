@@ -132,7 +132,7 @@ class Reinforcement(object):
                                                                 self.predictor, **kwargs)
         n_to_sample = 0
         if self.experience_buffer: #replace the most inactive to jak2 molecules in the batch with known active
-            n_to_sample = max(1, int(n_batch * ((np.sum(batch_distinct_rewards[:, 0] < 2.)) / n_batch) - 3.))
+            n_to_sample = max(1, int(n_batch * ((np.sum(batch_distinct_rewards[:, 0] < 2.)) / n_batch) ) - 3)
             if n_to_sample > 0:
                 samples = [self.experience_buffer[i] for i in np.random.randint(0, len(self.experience_buffer), n_to_sample)]
                 sample_rewards, sample_distinct_rewards = self.get_reward(self.args, samples,
@@ -148,9 +148,8 @@ class Reinforcement(object):
         end_of_batch_rewards = np.zeros((n_batch,))
 
         if self.get_end_of_batch_reward:
-            fngps = [mol2image(Chem.MolFromSmiles(tr[1:-1])) for tr in trajectories]
 
-            end_of_batch_rewards = self.get_end_of_batch_reward(fngps)
+            end_of_batch_rewards = self.get_end_of_batch_reward([tr[1:-1] for tr in trajectories])
 
 
         # Converting string of characters into tensor
@@ -275,7 +274,7 @@ class Reinforcement(object):
             self.experience_buffer = []
 
     def finetune(self, gen_data):
-        self.generator.fit(gen_data, self.args.batch_size_for_generate, self.args.n_finetune, 10000, 10000)
+        self.generator.fit(gen_data, self.args.batch_size_for_generate, self.args.n_finetune, print_every=10000, plot_every=10000)
 
 
 

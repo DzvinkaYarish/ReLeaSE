@@ -199,6 +199,7 @@ class StackAugmentedRNN(nn.Module):
         """
 
         inp = self.encoder(inp)
+
         if self.has_stack:
             if self.has_cell:
                 hidden_ = hidden[0]
@@ -347,6 +348,7 @@ class StackAugmentedRNN(nn.Module):
         self.optimizer.zero_grad()
         loss = 0
         for c in range(seq_len):
+
             output, hidden, stack = self(inp[:, c], hidden, stack)
             loss += self.criterion(output, target[:, c])
 

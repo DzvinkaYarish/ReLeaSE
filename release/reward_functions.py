@@ -1,6 +1,7 @@
 import numpy as np
 from utils import get_fp, get_fp_and_mol, get_ECFP, normalize_fp, mol2image
 from predictor import PROPERTY_PREDICTORS
+import Levenshtein
 
 from rdkit import Chem
 from rdkit.Chem import DataStructs
@@ -29,13 +30,53 @@ def calc_sim_ind_tanimoto(fngps):
 
     return si_vector
 
-def get_end_of_batch_reward_tanimoto_sim(fngps):
+def calc_sim_ind_levenstein(smiles):
+    n_of_smiles = len(smiles)
+    si_matrix = np.eye(n_of_smiles, dtype=np.float32)
+
+    for i1 in range(n_of_smiles):
+        for i2 in range(i1 + 1, n_of_smiles):
+            si = 1.0 / (1.0 + Levenshtein.distance(smiles[i1], smiles[i2]))
+            si_matrix[i1, i2] = si_matrix[i2, i1] = si
+
+    #si_vector = (np.sum(si_matrix, axis=0) - 1) / (n_of_smiles - 1)
+    si_vector = np.mean(si_matrix, axis=0)
+
+        #smiles_with_si[sm] = round(si_vector[i] * (19.5 - mols[sm].GetNumAtoms())**2, 3)
+
+
+    return si_vector
+
+
+def get_end_of_batch_reward_tanimoto_sim(smiles):
+    fngps = [mol2image(Chem.MolFromSmiles(sm)) for sm in smiles]
 
     avg_sim = calc_sim_ind_tanimoto(fngps)
 
     rwd = [-np.power(s * 4, 2) - 1 if s > 0.37 else 0 for s in avg_sim]
 
     return rwd
+
+def get_end_of_batch_reward_levenstein_sim(smiles):
+    avg_sim = calc_sim_ind_levenstein(smiles)
+
+    rwd = [-np.power(s * 4, 2) - 1 if s > 0.4 else 0 for s in avg_sim]
+
+    return rwd
+
+def get_end_of_batch_reward_tanimoto_levenstein_sim(smiles):
+    fngps = [mol2image(Chem.MolFromSmiles(sm)) for sm in smiles]
+
+    avg_sim_tan = calc_sim_ind_tanimoto(fngps)
+    avg_sim_lev = calc_sim_ind_levenstein(smiles)
+
+
+    rwd = [-np.power(s1 * s2 * 10, 4) - 1 if s1 * s2 > 0.08 else 0 for s1, s2 in zip(avg_sim_tan, avg_sim_lev)]
+    # rwd = [-np.power(max(s1, s2) * 4, 2) - 1 if max(s1, s2) > 0.4 else 0 for s1, s2 in zip(avg_sim_tan, avg_sim_lev)]
+
+
+    return rwd
+
 
 def get_multi_reward_ranges_multiple_ic50_smiles_clf_and_reg(args, smiles, predictors, invalid_reward=0.0, get_features=get_fp):
     rwds = []
@@ -81,7 +122,7 @@ def get_multi_reward_ranges_multiple_ic50_smiles_clf_and_reg(args, smiles, predi
             indx_to_predict = np.where(prop == 1.)[0]
         elif p_name_ == 'jak1_reg':  # jak1
             if len(indx_to_predict) > 0:
-                rwds[-1][np.array(indx_to_predict)] = -0.5 * np.maximum(np.full((len(indx_to_predict),), -1), np.exp(prop - 5) / 3)
+                rwds[-1][np.array(indx_to_predict)] = -0.5 * np.maximum(np.full((len(indx_to_predict),), -1), np.exp((prop - 5) / 3.))
             indx_to_predict = np.arange(0, len(smiles))
 
 
@@ -97,7 +138,7 @@ def get_multi_reward_ranges_multiple_ic50_smiles_clf_and_reg(args, smiles, predi
         elif p_name_ == 'jak3_reg':  # jak3
             if len(indx_to_predict) > 0:
 
-                rwds[-1][np.array(indx_to_predict)] = -0.5 * np.maximum(np.full((len(indx_to_predict),), -1), np.exp(prop - 5) / 3)
+                rwds[-1][np.array(indx_to_predict)] = -0.5 * np.maximum(np.full((len(indx_to_predict),), -1), np.exp((prop - 5) / 3.))
 
             indx_to_predict = np.arange(0, len(smiles))
 
@@ -399,6 +440,8 @@ def get_reward_func(args):
 def get_end_of_batch_reward_func(args):
     metric = args.end_of_batch_reward_func
     if metric == 'tan_similarity': return get_end_of_batch_reward_tanimoto_sim
+    if metric == 'lev_similarity': return get_end_of_batch_reward_levenstein_sim
+    if metric == 'tan_lev_similarity': return get_end_of_batch_reward_tanimoto_levenstein_sim
     else:
         return None
 
