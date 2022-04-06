@@ -13,10 +13,20 @@ from sklearn.ensemble import RandomForestRegressor as RFR
 
 from utils import get_fp, get_desc, normalize_desc, cross_validation_split
 
-PROPERTY_PREDICTORS = {'mwt': Descriptors.ExactMolWt}
+
+def calc_rings(mol):
+    try:
+        Chem.rdmolops.FindRingFamilies(mol)
+    except ValueError:
+        return 1.
+    rings = []
+    for ring in mol.GetRingInfo().AtomRingFamilies():
+        rings.append(len(ring))
+    return int(all(4 < r < 7 for r in rings))
+
+
+PROPERTY_PREDICTORS = {'mwt': Descriptors.ExactMolWt, 'rings_ok': calc_rings}
 PROPERTY_ESTIMATORS = {'RFR': RFR, 'CatBoost': CatBoostClassifier}
-
-
 
 
 class VanillaQSAR(object):

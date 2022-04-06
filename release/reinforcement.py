@@ -131,7 +131,7 @@ class Reinforcement(object):
         batch_rewards, batch_distinct_rewards = self.get_reward(self.args, [tr[1:-1] for tr in trajectories],
                                                                 self.predictor, **kwargs)
         n_to_sample = 0
-        if self.experience_buffer: #replace the most inactive to jak2 molecules in the batch with known active
+        if self.experience_buffer: #replace the most inactive molecules in the batch with known active
             n_to_sample = max(1, int(n_batch * ((np.sum(batch_distinct_rewards[:, 0] < 2.)) / n_batch) ) - 3)
             if n_to_sample > 0:
                 samples = [self.experience_buffer[i] for i in np.random.randint(0, len(self.experience_buffer), n_to_sample)]
@@ -210,7 +210,6 @@ class Reinforcement(object):
                                                            hidden,
                                                            stack)
 
-
                     log_probs = F.log_softmax(output, dim=1)
                     top_i = trajectory_input_batch[:, p + 1].detach().cpu().numpy()
                     actual_log_probs = log_probs[np.arange(0, len(log_probs)), top_i]
@@ -227,13 +226,7 @@ class Reinforcement(object):
                     clipped = ratios.gt(1 + self.args.eps_clip) | ratios.lt(1 - self.args.eps_clip)
                     clip_fraction += torch.as_tensor(clipped, dtype=torch.float32).mean().item()
 
-
-            # useful things to log
-            # approx_kl = (logprobs.detach() - old_logprobs.detach()).mean().item()
-
-
             # Doing backward pass and parameters update
-
 
                 rl_loss = rl_loss.mean()
                 rl_loss = rl_loss / int(np.ceil(n_batch / self.args.batch_size_for_generate))

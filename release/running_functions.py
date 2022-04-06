@@ -108,9 +108,8 @@ def training(args, RL_multi, gen_data, predictors,  unbiased_predictions):
 
         start = time.time()
 
-        for j in trange(args.n_policy, desc='Policy gradient...'):
+        for _ in trange(args.n_policy, desc='Policy gradient...'):
 
-            # cur_reward, cur_loss, cur_distinct_rewards = RL_multi.policy_gradient(gen_data, std_smiles=True, get_features=[None] * len(predictors_names))
             cur_reward, cur_loss, cur_distinct_rewards, sampled_from_buff_ratio, clip_ratio = RL_multi.policy_gradient(gen_data, std_smiles=False,
                                                                                   n_batch=args.batch_size)
         if step % args.finetune_freq == 0:
@@ -128,14 +127,11 @@ def training(args, RL_multi, gen_data, predictors,  unbiased_predictions):
         writer.add_scalar('clipped_ratio', clip_ratio, step)
 
 
-
-
-
         smiles_cur, valid_ratio, unique_ratio = generate(RL_multi.generator, args.n_to_generate, gen_data,
                                                          args.batch_size_for_generate)
 
-        # if step % args.trajectory_queue_update_freq == 0:
-        #     RL_multi.update_trajectories(smiles_cur)
+        if step % args.trajectory_queue_update_freq == 0:
+            RL_multi.update_trajectories(smiles_cur)
 
         plt.clf()
 
@@ -168,7 +164,7 @@ def training(args, RL_multi, gen_data, predictors,  unbiased_predictions):
 
         if step % 10 == 0:
             save_smiles(args, smiles_cur)
-            p_names_to_draw = ['jak1_reg', 'jak3_reg']
+            p_names_to_draw = ['jak2_reg', 'jak3_reg']
             # p_names_to_draw = []
             prediction_ic50 = []
             sm, preds = predict_and_plot(smiles_cur, predictors[predictors_names.index('IC50_reg')], get_features=get_fp,
@@ -183,7 +179,7 @@ def training(args, RL_multi, gen_data, predictors,  unbiased_predictions):
 
 
             # img = draw_smiles(args, sm, prediction_ic50, [ 'pIC50 jak2'])
-            img = draw_smiles(args, sm, prediction_ic50, ['pIC50 jak2', 'pIC50 jak1', 'pIC50 jak3'])
+            img = draw_smiles(args, sm, prediction_ic50, ['pIC50 jak1', 'pIC50 jak2', 'pIC50 jak3'])
 
             writer.add_image('Generated SMILES', matplotlib.image.pil_to_array(img), step, dataformats='HWC')
 
